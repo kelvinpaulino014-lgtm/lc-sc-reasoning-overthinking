@@ -1,0 +1,51 @@
+﻿# Python virtual environments & cache
+.venv/
+env/
+venv/
+__pycache__/
+*.py[cod]
+*.class
+.pytest_cache/
+.coverage
+
+# Temporary files & logs
+*.log
+*.tmp
+drive_folders.json
+upload_to_drive.py
+
+# Large model weights (if any)
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# LaTeX temporary build artifacts (keeping compiled PDFs)
+artigo_ieee/*.aux
+artigo_ieee/*.log
+artigo_ieee/*.out
+artigo_ieee/*.toc
+artigo_ieee/*.bbl
+artigo_ieee/*.blg
+artigo_ieee/*.fls
+artigo_ieee/*.fdb_latexmk
+artigo_ieee/*.synctex.gz
+
+relatorio_ia/*.aux
+relatorio_ia/*.log
+relatorio_ia/*.out
+relatorio_ia/*.toc
+relatorio_ia/*.synctex.gz
+
+apresentacao/*.aux
+apresentacao/*.log
+apresentacao/*.out
+apresentacao/*.nav
+apresentacao/*.snm
+apresentacao/*.toc
+apresentacao/*.synctex.gz
+
+entrega_etapa1_04nov/*.aux
+entrega_etapa1_04nov/*.log
+entrega_etapa1_04nov/*.out
+entrega_etapa1_04nov/*.synctex.gz

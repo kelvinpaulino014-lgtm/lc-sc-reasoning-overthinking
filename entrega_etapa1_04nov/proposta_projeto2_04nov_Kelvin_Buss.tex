@@ -1,0 +1,71 @@
+\documentclass[9pt,a4paper]{extarticle}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage[top=1.1cm, bottom=1.1cm, left=1.4cm, right=1.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{microtype}
+
+\definecolor{unbblue}{RGB}{0,51,102}
+\definecolor{unbgreen}{RGB}{0,102,51}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=unbblue,
+    urlcolor=unbblue,
+    citecolor=unbblue
+}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2.5pt}
+\linespread{0.97}
+
+\titleformat{\section}{\normalsize\bfseries\color{unbblue}}{\thesection.}{0.4em}{}[\titlerule]
+\titlespacing*{\section}{0pt}{4pt}{2.5pt}
+
+\begin{document}
+
+% Cabeçalho Institucional Compacto
+\begin{center}
+    {\normalsize\bfseries\color{unbblue} UNIVERSIDADE DE BRASÍLIA (UnB) -- INSTITUTO DE CIÊNCIAS EXATAS (IE)}\\
+    {\small\bfseries Departamento de Ciência da Computação (CIC) -- Pós-Graduação em Informática (PPGI)}\\
+    {\footnotesize Disciplina: PPGI0034 -- Redes Neurais e Aprendizado Profundo (2026/2) \quad|\quad Prof. Dr. Díbio Leandro Borges}\\
+    {\footnotesize \textbf{Entrega Etapa 1 (Proposta de Projeto Individual 2 -- Prazo: 04/11/2026)} \quad|\quad \textbf{Autor:} Kelvin Rafael Paulino Buss (\texttt{kelvin.buss@aluno.unb.br})}\\
+    {\footnotesize \textbf{Repositório GitHub do Projeto:} \url{https://github.com/kelvinbuss/ProjetoFinalRNAP_UnB2026}}
+\end{center}
+\vspace{-5pt}
+\noindent\textcolor{unbgreen}{\rule{\linewidth}{1.1pt}}
+\vspace{-7pt}
+
+\section{Título do Projeto Final}
+\textbf{Controle Dinâmico de ``Overthinking'' em Modelos de Linguagem via Parada Precoce Calibrada por Entropia em Cadeias de Pensamento (\textit{Chain-of-Thought})}
+
+\section{Pergunta de Pesquisa}
+\textit{``É possível mitigar o fenômeno de degradação de acurácia por excesso de tokens de raciocínio (`overthinking') em Small Language Models (1.5B a 3B de parâmetros) combinando o orçamento adaptativo de amostragem em tempo de teste com um critério online de truncamento e ponderação dinâmica do comprimento da cadeia de pensamento (CoT) guiado por entropia?''}
+
+\section{Resumo Executivo, Objetivos e Estrutura da Inovação}
+Modelos de linguagem de raciocínio (\textit{Reasoning Language Models} -- RLMs) escalam o processamento em tempo de teste (\textit{Test-Time Compute}) via \textit{Chain-of-Thought} (CoT) e votação por \textit{Self-Consistency} (SC). Contudo, estudos recentes demonstram que cadeias de pensamento excessivamente longas degradam a acurácia em uma curva em ``U invertido'' (\textit{overthinking}) (WU et al., 2026) e causam ``sobrecorreção'' (\textit{over-correction}) em modelos menores (HAO et al., 2026), além de diluição de atenção em contextos extensos (FENG et al., 2026). Paralelamente, métodos de escalonamento calibrado como o CaTS (HUANG et al., 2026) reduzem o número de trilhas amostradas ($N$), mas não restringem online o comprimento individual ($L_i$) de cada cadeia, desperdiçando tokens em trajetórias alucinadas ou circulares.
+
+\textbf{Estrutura da Inovação Proposta (\textit{Length-Calibrated Self-Consistency} -- LC-SC):}
+\begin{itemize}[leftmargin=1.2em, itemsep=1.2pt, topsep=1pt]
+    \item \textbf{QUAL é a inovação:} Propõe-se o decodificador \textbf{LC-SC}, um algoritmo de inferência online que controla conjuntamente a matriz de custo computacional $N \times L$ em tempo de teste. Diferente do \textit{Length-Filtered Vote} de (WU et al., 2026) --- que atua apenas \textit{post-hoc} após gerar todas as cadeias completas --- e do CaTS de (HUANG et al., 2026) --- que controla apenas o eixo de amostras $N$ ---, o LC-SC monitora em tempo real a entropia de Shannon $H_t = -\sum_{v \in \mathcal{V}} p(v \mid x, y_{<t})\log p(v \mid x, y_{<t})$ nos passos intermediários de raciocínio para realizar parada precoce bidimensional ($L$-\textit{Stopping} intratrilha e $N$-\textit{Stopping} intertrilhas) e votação ponderada por comprimento ótimo $\hat{y} = \arg\max_a \sum_{i=1}^{N_{\text{adap}}} \mathbb{I}(\text{ans}(r_i)=a)\cdot \hat{c}_i \cdot \exp(-\lambda \max(0, L_i - L^*)/\sigma_L)$.
+    \item \textbf{POR QUE é uma inovação:} Em \textit{Small Language Models} (ex.: \texttt{DeepSeek-R1-Distill-Qwen-1.5B} e \texttt{Qwen2.5-Math-1.5B}), trilhas que ultrapassam a zona ótima $L^*$ entram frequentemente em ciclos de hesitação ou degeneração. Na Tabela 1 de (HUANG et al., 2026), a calibração bruta do modelo de 1.5B no GSM8K cai de 64,31\% para 55,57\% em AUC devido a trilhas longas superconfiantes. Ao detectar picos sustentados de entropia ($\bar{H}_k > \tau_H$ após $L_{\min}$) e forçar a transição imediata ao fechamento da resposta (\texttt{</think>}), o LC-SC evita a geração de centenas de tokens espúrios e protege o consenso majoritário contra votos corrompidos por \textit{overthinking}.
+    \item \textbf{COMO observar nos resultados experimentais:} A validação será conduzida nos benchmarks matemáticos \textbf{GSM8K} e \textbf{MATH-500} comparando 5 métodos: (i) \textit{Greedy CoT}, (ii) \textit{Standard Self-Consistency} (Aula 11), (iii) \textit{Length-Filtered Vote post-hoc} (WU et al., 2026), (iv) \textit{CaTS} (HUANG et al., 2026) e (v) \textbf{LC-SC (Proposto)}. A inovação será comprovada por: (1) reprodução empírica da curva em U invertido de acurácia versus comprimento de tokens $L$; (2) deslocamento superior da \textbf{Fronteira de Pareto} (Acurácia Pass@1 vs. Custo Computacional médio em tokens gerados), demonstrando redução de 35\%--50\% no consumo de tokens com ganho de acurácia e menor erro de calibração esperado (\textit{Expected Calibration Error} -- ECE); e (3) estudo de ablação isolando os ganhos de $L$-\textit{Stopping}, $N$-\textit{Stopping} e da penalização exponencial de comprimento.
+\end{itemize}
+
+\textbf{Objetivos Específicos:} (1) Caracterizar empiricamente a curva em U invertido e a assinatura de entropia de trilhas com \textit{overthinking} em SLMs; (2) Implementar o decodificador online LC-SC integrando truncamento dinâmico $L$ e consenso calibrado $N$; (3) Avaliar a fronteira de Pareto (acurácia vs. tokens/latência) e o ECE frente aos 4 baselines do estado da arte no GSM8K e MATH-500.
+
+\section{Referências Relacionadas (Exclusivamente do ICLR 2026 -- Formato ABNT)}
+\begin{enumerate}[leftmargin=1.4em, itemsep=1.5pt, topsep=1pt]
+    \item \textbf{WU, Yuyang; WANG, Yifei; YE, Ziyu; DU, Tianqi; JEGELKA, Stefanie; WANG, Yisen.} When More is Less: Understanding Chain-of-Thought Length in LLMs. In: \textbf{The Fourteenth International Conference on Learning Representations (ICLR)}, 2026. Disponível em: \url{https://iclr.cc/virtual/2026/papers.html} (arXiv:2502.07266).
+    \item \textbf{HUANG, Chengsong; HUANG, Langlin; LENG, Jixuan; LIU, Jiacheng; HUANG, Jiaxin.} CaTS: Calibrated Test-Time Scaling for Efficient LLM Reasoning. In: \textbf{The Fourteenth International Conference on Learning Representations (ICLR)}, 2026. Disponível em: \url{https://iclr.cc/virtual/2026/papers.html} (arXiv:2503.00031).
+    \item \textbf{HAO, Qianyue; LI, Sibo; YUAN, Jian; LI, Yong.} RL of Thoughts: Navigating LLM Reasoning with Inference-time Reinforcement Learning. In: \textbf{The Fourteenth International Conference on Learning Representations (ICLR)}, 2026. Disponível em: \url{https://iclr.cc/virtual/2026/papers.html} (arXiv:2505.14140).
+    \item \textbf{FENG, Guhao; LUO, Shengjie; HUA, Kai; ZHANG, Ge; HE, Di; HUANG, Wenhao; CAI, Tianle.} In-Place Test-Time Training. In: \textbf{The Fourteenth International Conference on Learning Representations (ICLR)}, 2026 (Oral). Disponível em: \url{https://iclr.cc/virtual/2026/papers.html} (arXiv:2604.06169).
+\end{enumerate}
+
+\end{document}

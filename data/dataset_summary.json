@@ -1,0 +1,13 @@
+{
+  "seed": 42,
+  "gsm8k": {
+    "total_valid": 1319,
+    "val_calibration": 80,
+    "test": 200
+  },
+  "math500": {
+    "total_valid": 500,
+    "val_calibration": 80,
+    "test": 200
+  }
+}

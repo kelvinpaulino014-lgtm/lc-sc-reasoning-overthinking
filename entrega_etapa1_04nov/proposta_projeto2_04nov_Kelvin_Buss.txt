@@ -1,0 +1,101 @@
+================================================================================
+UNIVERSIDADE DE BRASILIA (UnB) - INSTITUTO DE CIENCIAS EXATAS (IE)
+Departamento de Ciencia da Computacao (CIC) - Pos-Graduacao em Informatica (PPGI)
+Disciplina: PPGI0034 - Redes Neurais e Aprendizado Profundo (2026/2)
+Professor: Prof. Dr. Dibio Leandro Borges
+Entrega Etapa 1 (Proposta de Projeto Individual 2 - Prazo: 04/11/2026 ate 23h59)
+Autor: Kelvin Rafael Paulino Buss (kelvin.buss@aluno.unb.br)
+Repositorio GitHub: https://github.com/kelvinbuss/ProjetoFinalRNAP_UnB2026
+================================================================================
+
+1. TITULO DO PROJETO FINAL
+--------------------------------------------------------------------------------
+Controle Dinamico de "Overthinking" em Modelos de Linguagem via Parada Precoce
+Calibrada por Entropia em Cadeias de Pensamento (Chain-of-Thought)
+
+2. PERGUNTA DE PESQUISA
+--------------------------------------------------------------------------------
+"E possivel mitigar o fenomeno de degradacao de acuracia por excesso de tokens
+de raciocinio ('overthinking') em Small Language Models (1.5B a 3B de parametros)
+combinando o orcamento adaptativo de amostragem em tempo de teste com um criterio
+online de truncamento e ponderacao dinamica do comprimento da cadeia de
+pensamento (CoT) guiado por entropia?"
+
+3. RESUMO EXECUTIVO, OBJETIVOS E ESTRUTURA DA INOVACAO
+--------------------------------------------------------------------------------
+Modelos de linguagem de raciocinio (Reasoning Language Models - RLMs) escalam o
+processamento em tempo de teste (Test-Time Compute) via Chain-of-Thought (CoT) e
+votacao por Self-Consistency (SC). Contudo, estudos recentes demonstram que
+cadeias de pensamento excessivamente longas degradam a acuracia em uma curva em
+"U invertido" (overthinking) (WU et al., 2026) e causam "sobrecorrecao"
+(over-correction) em modelos menores (HAO et al., 2026), alem de diluicao de
+atencao em contextos extensos (FENG et al., 2026). Paralelamente, metodos de
+escalonamento calibrado como o CaTS (HUANG et al., 2026) reduzem o numero de
+trilhas amostradas (N), mas nao restringem online o comprimento individual (L_i)
+de cada cadeia, desperdicando tokens em trajetorias alucinadas ou circulares.
+
+ESTRUTURA DA INOVACAO PROPOSTA (Length-Calibrated Self-Consistency - LC-SC):
+
+* QUAL e a inovacao:
+  Propoe-se o decodificador LC-SC, um algoritmo de inferencia online que controla
+  conjuntamente a matriz de custo computacional N x L em tempo de teste.
+  Diferente do Length-Filtered Vote de (WU et al., 2026) - que atua apenas
+  post-hoc apos gerar todas as cadeias completas - e do CaTS de (HUANG et al.,
+  2026) - que controla apenas o eixo de amostras N -, o LC-SC monitora em tempo
+  real a entropia de Shannon H_t nos passos intermediarios de raciocinio para
+  realizar parada precoce bidimensional (L-Stopping intratrilha e N-Stopping
+  intertrilhas) e votacao ponderada por comprimento otimo:
+  w_i = c_i * exp(-lambda * max(0, L_i - L*) / sigma_L).
+
+* POR QUE e uma inovacao:
+  Em Small Language Models (como DeepSeek-R1-Distill-Qwen-1.5B e Qwen2.5-Math-1.5B),
+  trilhas que ultrapassam a zona otima L* entram frequentemente em ciclos de
+  hesitacao ou degeneracao. Na Tabela 1 de (HUANG et al., 2026), a calibracao
+  bruta do modelo de 1.5B no GSM8K cai de 64,31% para 55,57% em AUC devido a
+  trilhas longas superconfiantes. Ao detectar picos sustentados de entropia
+  (H_bar_k > tau_H apos L_min) e forcar a transicao imediata ao fechamento da
+  resposta (</think>), o LC-SC evita a geracao de centenas de tokens espurios e
+  protege o consenso majoritario contra votos corrompidos por overthinking.
+
+* COMO observar nos resultados experimentais:
+  A validacao sera conduzida nos benchmarks matematicos GSM8K e MATH-500
+  comparando 5 metodos: (i) Greedy CoT, (ii) Standard Self-Consistency (Aula 11),
+  (iii) Length-Filtered Vote post-hoc (WU et al., 2026), (iv) CaTS (HUANG et al.,
+  2026) e (v) LC-SC (Proposto). A inovacao sera comprovada por:
+  (1) reproducao empirica da curva em U invertido de acuracia vs. comprimento L;
+  (2) deslocamento superior da Fronteira de Pareto (Acuracia Pass@1 vs. Custo
+      Computacional medio em tokens gerados), demonstrando reducao de 35%-50% no
+      consumo de tokens com ganho de acuracia e menor erro de calibracao (ECE);
+  (3) estudo de ablacao isolando os ganhos de L-Stopping, N-Stopping e da
+      penalizacao exponencial de comprimento.
+
+OBJETIVOS ESPECIFICOS:
+1. Caracterizar empiricamente a curva em U invertido e a assinatura de entropia
+   de trilhas com overthinking em SLMs;
+2. Implementar o decodificador online LC-SC integrando truncamento dinamico L e
+   consenso calibrado N;
+3. Avaliar a fronteira de Pareto (acuracia vs. tokens/latencia) e o ECE frente
+   aos 4 baselines do estado da arte no GSM8K e MATH-500.
+
+4. REFERENCIAS RELACIONADAS (EXCLUSIVAMENTE DO ICLR 2026 - FORMATO ABNT)
+--------------------------------------------------------------------------------
+[1] WU, Yuyang; WANG, Yifei; YE, Ziyu; DU, Tianqi; JEGELKA, Stefanie; WANG, Yisen.
+    When More is Less: Understanding Chain-of-Thought Length in LLMs. In: The
+    Fourteenth International Conference on Learning Representations (ICLR), 2026.
+    Disponivel em: https://iclr.cc/virtual/2026/papers.html (arXiv:2502.07266).
+
+[2] HUANG, Chengsong; HUANG, Langlin; LENG, Jixuan; LIU, Jiacheng; HUANG, Jiaxin.
+    CaTS: Calibrated Test-Time Scaling for Efficient LLM Reasoning. In: The
+    Fourteenth International Conference on Learning Representations (ICLR), 2026.
+    Disponivel em: https://iclr.cc/virtual/2026/papers.html (arXiv:2503.00031).
+
+[3] HAO, Qianyue; LI, Sibo; YUAN, Jian; LI, Yong. RL of Thoughts: Navigating LLM
+    Reasoning with Inference-time Reinforcement Learning. In: The Fourteenth
+    International Conference on Learning Representations (ICLR), 2026.
+    Disponivel em: https://iclr.cc/virtual/2026/papers.html (arXiv:2505.14140).
+
+[4] FENG, Guhao; LUO, Shengjie; HUA, Kai; ZHANG, Ge; HE, Di; HUANG, Wenhao;
+    CAI, Tianle. In-Place Test-Time Training. In: The Fourteenth International
+    Conference on Learning Representations (ICLR), 2026 (Oral).
+    Disponivel em: https://iclr.cc/virtual/2026/papers.html (arXiv:2604.06169).
+================================================================================

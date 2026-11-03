@@ -1,0 +1,352 @@
+====================================================================================================
+           ESTRUTURA DE DECISOES DO PROJETO 2 - REDES NEURAIS E APRENDIZADO PROFUNDO
+                 UNIVERSIDADE DE BRASILIA (UnB) - PPGI - TURMA 2026/2 (PROF. DIBIO)
+                 MAPEAMENTO ESTRATEGICO: 5 OPCOES DE PESQUISA x 20 ARTIGOS ICLR 2026
+====================================================================================================
+
+[INFORMACOES DE CONTEXTO E REQUISITOS DO EDITAL]
+* Artigo Principal: Formato IEEE Conference (dupla coluna, 6 a 8 paginas, incluindo figuras e referencias).
+* Referencias no corpo do texto: Padrao ABNT completo (AUTOR, ano).
+* Condicao Obrigatoria: Escolher de 1 a 4 artigos correlatos publicados no ICLR 2026 (The Fourteenth
+  International Conference on Learning Representations - https://iclr.cc/virtual/2026/papers.html).
+* Nucleo de Avaliacao: Propor e demonstrar experimentalmente nos resultados:
+    1) QUAL e a inovacao proposta;
+    2) POR QUE ela e necessaria / ocorre;
+    3) COMO ela pode ser observada e mensurada graficamente e numericamente em relacao aos artigos base.
+* Segundo Relatorio: Documento de 2 paginas detalhando o uso de Modelos de Inteligencia Artificial no apoio
+  ao desenvolvimento do projeto.
+* Repositorio: GitHub pessoal com diretorio padronizado (/ProjetoFinalRNAP_UnB2026).
+* Defesa Oral: Apresentacao de 5 minutos contendo exatamente 4 slides.
+* Hardware Alvo de Execucao Local: NVIDIA GeForce RTX 3050 Laptop (6 GB VRAM). Todos os projetos foram
+  planejados para rodar de forma rapida, controlada e eficiente nessa infraestrutura.
+
+
+====================================================================================================
+                       MATRIZ COMPARATIVA DE DECISAO RAPIDA DAS 5 OPCOES
+====================================================================================================
++--------+------------------------------------+--------------------------+---------------------+
+| Opcao  | Eixo Tematico Principal (Aulas)    | Tempo de Execucao (GPU)  | Facilidade de Prova |
++--------+------------------------------------+--------------------------+---------------------+
+| 1      | Aprendizado Contrastivo & DINO     | ~30 a 60 min             | Muito Alta (SOTA)   |
+| 2      | Raciocinio em LLMs & Test-Time     | ~20 a 40 min             | Muito Alta (Pareto) |
+| 3      | Vision-Language Models (CLIP)      | ~15 a 30 min             | Muito Alta (Spars.) |
+| 4      | Generativos (Rectified Flow / EDO) | ~40 a 90 min             | Alta (Passos/FID)   |
+| 5      | Deteccao de Anomalias & Ciber      | ~15 a 30 min             | Muito Alta (F1/AUC) |
++--------+------------------------------------+--------------------------+---------------------+
+
+
+====================================================================================================
+                                  DETALHAMENTO COMPLETO DAS 5 OPCOES
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+OPCAO 1: APRENDIZADO AUTOSSUPERVISIONADO E ALINHAMENTO CONTRASTIVO (AULA 10)
+----------------------------------------------------------------------------------------------------
+* Titulo Proposto:
+  Ponte Semissupervisionada via Projecao Contrastiva e Auto-Destilacao EMA: Alinhando Representacoes
+  Autossupervisionadas em Regimes de Baixa Rotulagem.
+
+* Pergunta de Pesquisa:
+  Como a combinacao de uma funcao de perda contrastiva generalizada por projecao (ProjNCE) com o mecanismo
+  de media movel exponencial (EMA) nao-contrastivo pode acelerar o alinhamento representacional entre o
+  aprendizado autossupervisionado e o supervisionado quando apenas 1% a 10% dos rotulos estao disponiveis?
+
+* Os 4 Artigos Correlatos do ICLR 2026:
+  [1] LUTHRA, Achleshwar; MISHRA, Priyadarsi; GALANTI, Tomer.
+      "On the Alignment Between Supervised and Self-Supervised Contrastive Learning".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Demonstra formalmente via similaridade CKA e RSA que o aprendizado contrastivo
+      autossupervisionado (CL) e o supervisionado com foco em negativos (NSCL) convergem para a mesma
+      geometria latente, porem com velocidade de alinhamento dependente do tamanho de lote.
+
+  [2] JEONG, Minoh; HERO, Alfred O.
+      "Generalizing Supervised Contrastive Learning: A Projection Perspective".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Formula a perda ProjNCE, que unifica o limite de informacao mutua do InfoNCE
+      (SimCLR) com o aprendizado contrastivo supervisionado por meio de funcoes de projecao flexiveis.
+
+  [3] PONCE, Jean; TERVER, Basile; HEBERT, Martial; ARBEL, Michael.
+      "Dual Perspectives on Non-Contrastive Self-Supervised Learning".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Analisa sob a optica de sistemas dinamicos a estabilidade do uso de professor EMA
+      e stop-gradient (estilo BYOL e DINO) na prevencao de colapso representacional.
+
+  [4] KRSMANOVIC, Vladimir et al.
+      "Learning Representations Through Contrastive Neural Model Checking".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Explora a verificacao formal de invariancias geometricas e robustez em espacos
+      latentes aprendidos contrastivamente.
+
+* Estrutura da Inovacao:
+  - QUAL e a inovacao:
+    Desenvolvimento da funcao de perda hibrida "EMA-ProjNCE", que acopla uma rede professora atualizada via
+    EMA (inspirada em Ponce et al., 2026 e nos conceitos de DINO da Aula 10) diretamente na geracao de
+    alvos e no espaco de projecao da perda ProjNCE (Jeong & Hero, 2026) em regime semissupervisionado.
+  - POR QUE ocorre:
+    Em GPUs com memoria restrita (6 GB), o SimCLR e o ProjNCE sofrem degradacao severa devido ao pequeno
+    tamanho de lote (batch size 64-128), gerando estimativas ruidosas de pares negativos. O uso do professor
+    EMA atua como um regularizador temporal que suaviza o manifold latente e reduz o viés de falsos
+    negativos sem exigir batches massivos (ex: 4096).
+  - COMO observar nos resultados:
+    1) Grafico de Similaridade CKA (Centered Kernel Alignment) comparando a convergencia da representacao
+       com o modelo supervisionado de referencia (mostrando alinhamento 3x mais rapido com poucos dados).
+    2) Tabelas de Linear Probing e avaliacao k-NN (protocolo oficial do Slide 26 da Aula 10) em CIFAR-100
+       ou STL-10 com 1% e 5% de dados rotulados, comprovando ganho de 3% a 6% sobre o SimCLR padrao.
+    3) Projecao t-SNE mostrando menor dispersao intraclasse e separacao de margem superior.
+
+
+----------------------------------------------------------------------------------------------------
+OPCAO 2: EFICIENCIA DE RACIOCINIO (CoT) E TEST-TIME COMPUTE EM LLMs (AULA 11 + PROJETO 1)
+----------------------------------------------------------------------------------------------------
+* Titulo Proposto:
+  Controle Dinamico de "Overthinking" em Modelos de Linguagem via Parada Precoce Calibrada por Entropia
+  em Cadeias de Pensamento (CoT).
+
+* Pergunta de Pesquisa:
+  E possivel mitigar o fenomeno de degradacao de acuracia por excesso de tokens de raciocinio (overthinking)
+  em Small Language Models (1.5B a 3B) combinando o orcamento adaptativo de amostragem do CaTS com um
+  criterio de truncamento dinamico do comprimento da cadeia CoT baseado em entropia de decodificacao?
+
+* Os 4 Artigos Correlatos do ICLR 2026:
+  [1] WU, Yuyang et al.
+      "When More is Less: Understanding Chain-of-Thought Length in LLMs".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Descobre que a relacao entre tamanho da cadeia de raciocinio (tokens CoT) e a
+      acuracia segue uma curva em U invertido; raciocinar em excesso introduz acumulacao de erros e
+      alucinacao estrutural (overthinking).
+
+  [2] HUANG, Chengsong et al.
+      "CaTS: Calibrated Test-Time Scaling for Efficient LLM Reasoning".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Demonstra que metodos classicos de Self-Consistency (Aula 11, Slide 17) desperdicam
+      amostras fixas em questoes triviais, propondo uma parada antecipada com base na confianca do modelo.
+
+  [3] HAO, Qianyue et al.
+      "RL of Thoughts: Navigating LLM Reasoning with Inference-time Reinforcement Learning".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Cria um micro-navegador neural (<3K parametros) que orquestra blocos cognitivos
+      durante a inferencia para modelos menores.
+
+  [4] FENG, Guhao et al.
+      "In-Place Test-Time Training".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026 (Oral).
+      Contribuicao Base: Apresenta adaptacao rapida de pesos internos em tempo de teste em vez de depender
+      apenas de expansao ilimitada do prompt ou contexto.
+
+* Estrutura da Inovacao:
+  - QUAL e a inovacao:
+    Implementacao do algoritmo "Length-Calibrated Self-Consistency (LC-SC)". Enquanto o CaTS controla
+    apenas a quantidade de trajetorias N, e Wu et al. analisam o comprimento estatico L, a proposta
+    regula conjuntamente a matriz N x L em tempo real, monitorando mudancas abruptas na entropia dos
+    tokens gerados para abortar ramos que entraram em derivas alucinatórias.
+  - POR QUE ocorre:
+    Em modelos compactos quantizados (ex: Qwen-2.5-Coder-1.5B-Instruct ou Llama-3.2-3B), o acúmulo de tokens
+    de reflexao apos a resolucao do cerne logico aumenta a probabilidade de erros de sintaxe ou mudanca de
+    resposta correta para errada. Cortar os ramos no ponto maximo da curva em U invertido preserva a pureza
+    do consenso na votacao majoritaria.
+  - COMO observar nos resultados:
+    1) Curva de Desempenho em U Invertido: Grafico comprovando a queda de acuracia apos determinado
+       comprimento medio de tokens no dataset GSM8K / SVAMP.
+    2) Fronteira de Eficiencia de Pareto: Grafico comparativo de Acuracia Final vs. Total de Tokens Gerados,
+       provando que o LC-SC atinge acuracia igual ou superior ao Self-Consistency padrao consumindo entre
+       40% e 55% menos tokens na RTX 3050.
+
+
+----------------------------------------------------------------------------------------------------
+OPCAO 3: VISION-LANGUAGE MODELS (CLIP), ESPARSIDADE E ADAPTACAO CONTINUA (AULA 11)
+----------------------------------------------------------------------------------------------------
+* Titulo Proposto:
+  Projecao Esparsa Guiada por Conceitos e Fusao de Pesos para Classificacao Zero-Shot e Few-Shot
+  Interpretavel em Modelos CLIP.
+
+* Pergunta de Pesquisa:
+  Como a imposicao de esparsidade estruturada na cabeca de projecao multimodal do CLIP, combinada com
+  fusao continua de modelos, impacta o equilibrio entre interpretabilidade semantica e capacidade de
+  generalizacao em dominios visuais com distribuicoes deslocadas (como imagens de satelite ou texturas)?
+
+* Os 4 Artigos Correlatos do ICLR 2026:
+  [1] QIN, Chuan; VENHOFF, Constantin; JOSEPH, Sonia; XIAO, Fanyi; SCHERER, Stefan.
+      "Sparse CLIP: Co-Optimizing Interpretability and Performance in Contrastive Learning".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Resolve a opacidade das representacoes densas do CLIP induzindo esparsidade
+      direta no treinamento e gerando neuronios monosemanticos de alta interpretabilidade.
+
+  [2] TANG, Hao et al.
+      "UniLiP: Adapting CLIP for Unified Multimodal Understanding, Generation, and Editing".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Adapta o espaco latente do CLIP para preservar tanto caracteristicas semanticas
+      globais quanto detalhes espaciais densos por meio de auto-destilacao.
+
+  [3] GAO, Haoyuan et al.
+      "Enhanced Continual Learning of Vision-Language Models with Model Fusion".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Propoe a interpolacao geometrica de pesos (Model Fusion) para adaptar modelos CLIP
+      a novas tarefas sequenciais sem incorrer em esquecimento catastrofico do espaco original.
+
+  [4] XU, Ruyi et al.
+      "StreamingVLM: Real-Time Understanding for Infinite Video Streams".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Explora a retencao de informacao relevante e reducao de redundancia em espacos
+      latentes multimodais sob restricoes severas de memoria.
+
+* Estrutura da Inovacao:
+  - QUAL e a inovacao:
+    Criacao do adaptador multimodal "Sparse-Fusion Adapter (SFA)" acoplado a um CLIP (ViT-B/32 congelado).
+    O adaptador impoe uma penalizacao de esparsidade Top-K no espaco de projecao conjunta e realiza uma
+    fusao balanceada de pesos (Model Fusion) focada nos conjuntos de dados onde o CLIP Zero-Shot falha
+    criticamente (ponto enfaticamente destacado no Slide 36 da Aula 11: EuroSAT -37.1%, DTD -18.2%).
+  - POR QUE ocorre:
+    Modelos CLIP padrao espalham informacoes semanticas por centenas de dimensoes densas correlacionadas.
+    Ao forcar que apenas k neuronios ativos representem caracteristicas chave (ex: "agua", "floresta",
+    "asfalto") e fundir essa projecao com a base pre-treinada, elimina-se o colapso de generalizacao em
+    imagens com forte mudanca de dominio sem perder o vocabulario aberto original.
+  - COMO observar nos resultados:
+    1) Tabela de Acuracia em Dominios Desafiadores: Comparativo no dataset EuroSAT ou DTD mostrando a
+       superacao do Zero-Shot original (recuperando a perda apontada nos slides do professor).
+    2) Metrica de Esparsidade e Interpretabilidade: Demonstracao de que 80% das ativacoes sao nulas, com
+       mapas de ativacao visual evidenciando quais neuronios esparsos disparam para cada conceito textual.
+    3) Teste de Esquecimento Catastrofico: Verificacao de retencao de acuracia no ImageNet-1K / CIFAR-10.
+
+
+----------------------------------------------------------------------------------------------------
+OPCAO 4: MODELOS GENERATIVOS - ESTABILIZACAO E ACELERACAO DE RECTIFIED FLOW (AULA 12)
+----------------------------------------------------------------------------------------------------
+* Titulo Proposto:
+  Amostragem Acelerada e Inversao Estavel em Modelos Generativos de Fluxo Retificado (Rectified Flow)
+  com Integracao Adaptativa Anti-Rigidez.
+
+* Pergunta de Pesquisa:
+  De que maneira a regularizacao livre de treinamento para inversao de fluxo retificado, aliada a um
+  escalonamento de passos sensivel a rigidez numerica (stiffness), permite reconstruir e gerar amostras
+  de alta fidelidade com um orcamento ultra-reduzido de passos de integracao (2 a 8 passos)?
+
+* Os 4 Artigos Correlatos do ICLR 2026:
+  [1] WANG, Chenru; ZHU, Beier; ZHANG, Chi.
+      "Free Lunch for Stabilizing Rectified Flow Inversion".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Apresenta uma correcao teorica e algoritmica sem retreinamento que anula o desvio
+      acumulado na inversao de trajetorias ODE em modelos de Rectified Flow.
+
+  [2] TAN, Zheng et al.
+      "STORK: Faster Diffusion and Flow Matching Sampling by Resolving both Stiffness and Structure-Dependence".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Analisa a rigidez das trajetorias de fluxo perto dos extremos t=0 e t=1, propondo
+      um esquema de passos adaptativos que supera integradores Runge-Kutta e Euler convencionais.
+
+  [3] MCALLISTER, David et al.
+      "Flow Matching Policy Gradients".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Estabelece formulacoes de transporte direto de campos de velocidade sob condicoes
+      de contorno arbitrarias.
+
+  [4] AUTORES DE FLOW MATCHING ICLR 2026.
+      "Carre du champ Flow Matching: Better Quality and Convergence Guarantees".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Trata das propriedades de generalizacao, preservacao do manifold de dados e menor
+      curvatura nas trajetorias gerativas.
+
+* Estrutura da Inovacao:
+  - QUAL e a inovacao:
+    Aprimoramento do algoritmo basico de Conditional Rectified Flow apresentado nos Slides 49 a 51 da Aula 12
+    (x_t = (1-t)x + tz, v = z - x). Substitui-se o amostrador ingênuo de Euler uniforme (linspace) por um
+    integrador hibrido de passos curvos com correcao livre de inversao (inspirado em Wang et al. e Tan et al.).
+  - POR QUE ocorre:
+    Nos slides da Aula 12, a aproximacao da EDO por passos lineares uniformes gera erros de discretizacao
+    criticos quando se tenta reduzir o numero de passos (NFE) para 2, 4 ou 8 avaliacoes. Corrigir a curvatura
+    nas regioes de alta rigidez matematica permite gerar e inverter imagens sem distorcao e sem o alto custo
+    computacional de dezenas de passos de difusao tradicional.
+  - COMO observar nos resultados:
+    1) Grafico de Qualidade (FID / L2 Reconstruction Error) em funcao do numero de passos (NFE = 2, 4, 8, 16):
+       O metodo proposto devera manter baixa degradacao visual mesmo com apenas 4 passos de inferencia.
+    2) Reversibilidade e Inversao Exata: Visualizacao de pares (Imagem Original -> Ruido Invertido z -> Imagem
+       Reconstruida), demonstrando ausencia de artefatos em relacao ao Euler uniforme dos slides.
+
+
+----------------------------------------------------------------------------------------------------
+OPCAO 5: DETECCAO DE ANOMALIAS EM SERIES TEMPORAIS COM MODELOS FUNDACIONAIS (CIBERSEGURANCA / AULAS 10-12)
+----------------------------------------------------------------------------------------------------
+* Titulo Proposto:
+  Deteccao de Anomalias Guiada por Complexidade e Sintese Programatica de Outliers: Superando a
+  Hipergeneralizacao de Modelos Fundacionais em Monitoramento de Redes.
+
+* Pergunta de Pesquisa:
+  Por que modelos profundos de reconstrucao e Modelos Fundacionais de Series Temporais falham diante de
+  anomalias sutis em fluxos de telemetria, e como um ensemble ponderado por complexidade estatistica
+  local treinado com outliers sinteticos gerados por codigo supera esse gargalo?
+
+* Os 4 Artigos Correlatos do ICLR 2026:
+  [1] KIM, Jongwon; YOON, Samuel; KO, Young; KIM, Yerin; KIM, Sung; TAE, Jaeung.
+      "Complexity- and Statistics-Guided Anomaly Detection in Time Series Foundation Models".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Diagnostica que grandes modelos de series temporais reconstroem anomalias com
+      perfeicao excessiva (overgeneralization), impedindo que o erro de reconstrucao acuse o desvio, e propoe
+      um ensemble consciente de complexidade (CAE).
+
+  [2] ZHU, Xiaokun; CARPENTIER, Louis; VERBEKE, Mathias.
+      "When Foundation Models are One-Liners: Limitations and Future Directions for Time Series Anomaly Detection".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Demonstra atraves de experimentos extensivos que modelos fundacionais complexos
+      frequentemente perdem para baselines estatisticos simples se nao houver recalibracao de janelas locais.
+
+  [3] YE, Hangting et al.
+      "LLM as an Algorithmist: Enhancing Anomaly Detectors via Programmatic Synthesis (LLM-DAS)".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Emprega LLMs fora da linha de inferencia sensivel para sintetizar algoritmicamente
+      em Python padroes de anomalias dificeis (hard outliers), servindo de aumento de dados robusto.
+
+  [4] HU, Shiyan et al.
+      "Towards Multimodal Time Series Anomaly Detection with Semantic Alignment and Condensed Interaction (MindTS)".
+      In: Proceedings of the Fourteenth International Conference on Learning Representations (ICLR), 2026.
+      Contribuicao Base: Investiga o alinhamento de series temporais continuas com informacoes semanticas e
+      descricoes textuais de incidentes.
+
+* Estrutura da Inovacao:
+  - QUAL e a inovacao:
+    Criacao da arquitetura "ProgCAE-Net" para deteccao de anomalias e ataques de rede (ex: port scans,
+    ataques DoS, exfiltracao de dados). O sistema combina um autoencoder/backbone temporal (visto na Aula 12,
+    Slide 16) com o modulo de calibracao de complexidade estatistica de Kim et al. (2026), treinado com um
+    banco de anomalias geradas via sintese programatica de codigo (metodologia LLM-DAS de Ye et al., 2026).
+  - POR QUE ocorre:
+    O autoencoder tradicional minimiza a perda L2 global e acaba aprendendo a reproduzir anomalias de baixa
+    frequencia (hipergeneralizacao comprovada por Zhu et al. e Kim et al.). A presenca de anomalias sinteticas
+    severas no treino forca o modelo a manter erro alto em desvios, enquanto o ponderador estatistico cancela
+    falsos positivos em periodos de trafego normalmente ruidoso.
+  - COMO observar nos resultados:
+    1) Tabela de F1-Score, AUC-ROC e Precision@K em datasets reais de trafego/seguranca (ex: UNSW-NB15 ou
+       NAB/SMD), comparando: Autoencoder Padrao vs. Baseline Estatistico vs. ProgCAE-Net.
+    2) Estudo de Ablocao: Grafico de barras isolando o impacto individual da sintese programatica de
+       outliers e do modulo de complexidade estatistica, provando a tese de Kim et al. e Ye et al.
+
+
+====================================================================================================
+                        ROTEIRO SEQUENCIAL DE EXECUCAO DO PROJETO (5 OBJETIVOS)
+====================================================================================================
+
+Para qualquer uma das 5 opcoes escolhidas, a conducao do trabalho deve seguir rigorosamente os
+cinco objetivos abaixo, refletindo as secoes do artigo IEEE (6 a 8 paginas):
+
+[OBJETIVO 1] - Fundamentacao Teorica e Revisao Sistematica (Secao II: Related Work)
+  * Mapeamento aprofundado dos 4 artigos correlatos do ICLR 2026;
+  * Identificacao do Research Gap (a falha ou hipotese em aberto deixada pelos artigos);
+  * Formatacao inicial das citacoes em padrao ABNT (AUTOR, ano).
+
+[OBJETIVO 2] - Construcao do Baseline Experimental (Secao III: Methodology - Base Setup)
+  * Estruturacao do codigo em PyTorch no repositorio /ProjetoFinalRNAP_UnB2026;
+  * Implementacao do modelo e protocolo baseline ensinado em aula (Aulas 10, 11 ou 12);
+  * Replicacao da limitacao apontada na literatura (diagnostico do gargalo).
+
+[OBJETIVO 3] - Formulacao e Implementacao da Inovacao (Secao III: Proposed Methodology)
+  * Deducoes matematicas da alteracao arquitetural, funcao de perda ou decodificacao;
+  * Validacao de limites de complexidade temporal O(.) e espacial O(.) compativeis com 6 GB VRAM;
+  * Parametrizacao modular para facilitar comparacoes diretas.
+
+[OBJETIVO 4] - Validacao Experimental e Ablocao (Secao IV: Experimental Evaluation)
+  * Conducao dos experimentos com seeds controladas e divisao rigorosa de treino/validacao/teste;
+  * Producao de graficos vetoriais de alta qualidade (Curvas de Treino, Pareto, CKA, t-SNE);
+  * Estudo de ablocao quantitativo comprovando a causa e o efeito da inovacao.
+
+[OBJETIVO 5] - Redacao Tecnica e Finalizacao dos Entregaveis (Secao V: Conclusion & Relatorios)
+  * Redacao do artigo IEEE de 6 a 8 paginas em LaTeX/Overleaf ou Word (dupla coluna);
+  * Elaboracao do relatorio obrigatorio de 2 paginas sobre o uso detalhado de IA generativa;
+  * Criacao do deck de apresentacao contendo exatamente 4 slides para a defesa oral de 5 minutos.
+====================================================================================================
