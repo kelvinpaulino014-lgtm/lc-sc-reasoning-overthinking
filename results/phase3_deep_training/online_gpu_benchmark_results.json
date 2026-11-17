@@ -1,0 +1,134 @@
+{
+  "gsm8k": {
+    "peak_vram_mb": 3960.2,
+    "n_questions": 10,
+    "methods": {
+      "Greedy CoT (N=1)": {
+        "accuracy_pct": 50.0,
+        "ci95_low_pct": 20.0,
+        "ci95_high_pct": 80.0,
+        "avg_tokens": 317.5,
+        "token_saving_vs_sc_pct": 86.8,
+        "avg_samples_used": 1.0,
+        "avg_latency_sec": 9.98,
+        "speedup_vs_sc": 2.41,
+        "throughput_tok_per_sec": 31.8,
+        "peak_vram_mb": 3960.2,
+        "ece_pct": 49.87,
+        "brier_score": 0.3912,
+        "roc_auc_pct": 56.0
+      },
+      "Standard SC (N=8)": {
+        "accuracy_pct": 60.0,
+        "ci95_low_pct": 30.0,
+        "ci95_high_pct": 90.0,
+        "avg_tokens": 2406.5,
+        "token_saving_vs_sc_pct": 0.0,
+        "avg_samples_used": 8.0,
+        "avg_latency_sec": 24.04,
+        "speedup_vs_sc": 1.0,
+        "throughput_tok_per_sec": 100.1,
+        "peak_vram_mb": 3960.2,
+        "ece_pct": 34.45,
+        "brier_score": 0.1845,
+        "roc_auc_pct": 95.83
+      },
+      "CaTS (Huang et al., 2026)": {
+        "accuracy_pct": 60.0,
+        "ci95_low_pct": 30.0,
+        "ci95_high_pct": 90.0,
+        "avg_tokens": 1971.9,
+        "token_saving_vs_sc_pct": 18.1,
+        "avg_samples_used": 6.4,
+        "avg_latency_sec": 19.93,
+        "speedup_vs_sc": 1.21,
+        "throughput_tok_per_sec": 98.9,
+        "peak_vram_mb": 3960.2,
+        "ece_pct": 24.14,
+        "brier_score": 0.091,
+        "roc_auc_pct": 100.0
+      },
+      "LC-SC Phase 3 (Neural GPU)": {
+        "accuracy_pct": 70.0,
+        "ci95_low_pct": 40.0,
+        "ci95_high_pct": 100.0,
+        "avg_tokens": 2501.7,
+        "token_saving_vs_sc_pct": -4.0,
+        "avg_samples_used": 8.0,
+        "avg_latency_sec": 24.87,
+        "speedup_vs_sc": 0.97,
+        "throughput_tok_per_sec": 100.6,
+        "peak_vram_mb": 3960.2,
+        "ece_pct": 40.52,
+        "brier_score": 0.1801,
+        "roc_auc_pct": 90.48
+      }
+    }
+  },
+  "math500": {
+    "peak_vram_mb": 3930.5,
+    "n_questions": 10,
+    "methods": {
+      "Greedy CoT (N=1)": {
+        "accuracy_pct": 60.0,
+        "ci95_low_pct": 30.0,
+        "ci95_high_pct": 90.0,
+        "avg_tokens": 342.8,
+        "token_saving_vs_sc_pct": 87.7,
+        "avg_samples_used": 1.0,
+        "avg_latency_sec": 10.87,
+        "speedup_vs_sc": 2.35,
+        "throughput_tok_per_sec": 31.5,
+        "peak_vram_mb": 3930.5,
+        "ece_pct": 41.38,
+        "brier_score": 0.3408,
+        "roc_auc_pct": 54.17
+      },
+      "Standard SC (N=8)": {
+        "accuracy_pct": 60.0,
+        "ci95_low_pct": 30.0,
+        "ci95_high_pct": 90.0,
+        "avg_tokens": 2787.7,
+        "token_saving_vs_sc_pct": 0.0,
+        "avg_samples_used": 8.0,
+        "avg_latency_sec": 25.56,
+        "speedup_vs_sc": 1.0,
+        "throughput_tok_per_sec": 109.1,
+        "peak_vram_mb": 3930.5,
+        "ece_pct": 42.61,
+        "brier_score": 0.2447,
+        "roc_auc_pct": 54.17
+      },
+      "CaTS (Huang et al., 2026)": {
+        "accuracy_pct": 40.0,
+        "ci95_low_pct": 10.0,
+        "ci95_high_pct": 70.0,
+        "avg_tokens": 2300.1,
+        "token_saving_vs_sc_pct": 17.5,
+        "avg_samples_used": 6.4,
+        "avg_latency_sec": 20.93,
+        "speedup_vs_sc": 1.22,
+        "throughput_tok_per_sec": 109.9,
+        "peak_vram_mb": 3930.5,
+        "ece_pct": 42.93,
+        "brier_score": 0.2418,
+        "roc_auc_pct": 70.83
+      },
+      "LC-SC Phase 3 (Neural GPU)": {
+        "accuracy_pct": 40.0,
+        "ci95_low_pct": 10.0,
+        "ci95_high_pct": 70.0,
+        "avg_tokens": 2720.8,
+        "token_saving_vs_sc_pct": 2.4,
+        "avg_samples_used": 7.6,
+        "avg_latency_sec": 25.14,
+        "speedup_vs_sc": 1.02,
+        "throughput_tok_per_sec": 108.2,
+        "peak_vram_mb": 3930.5,
+        "ece_pct": 46.27,
+        "brier_score": 0.2301,
+        "roc_auc_pct": 66.67
+      }
+    }
+  }
+}
