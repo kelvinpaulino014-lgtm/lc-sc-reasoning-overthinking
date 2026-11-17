@@ -429,6 +429,30 @@ class TestDecodersAndAblations(unittest.TestCase):
             self.assertIn("accuracy_ci", summary)
             self.assertIn("ece", summary)
 
+    def test_phase2_clean_step_stats_on_l_stop(self) -> None:
+        """Verifica que o L-Stopping da Fase 2 preserva confiança e entropia dos passos limpos pré-pico."""
+        dec = LCSCDecoder(n_max=6, n_min=3, l_min=30, tau_h=0.70, entropy_window=2, auto_calibrate_tau_h=False)
+        trace = CoTTrace(
+            question_id="q_clean_stats",
+            sample_idx=0,
+            full_text="",
+            total_tokens=160,
+            final_answer="99",
+            raw_confidence=0.60,
+            mean_entropy=0.80,
+            steps=[
+                CoTStep(0, 40, 0.20, 0.92, intermediate_answer="42", is_overthinking_transition=False),
+                CoTStep(1, 80, 0.25, 0.90, intermediate_answer="42", is_overthinking_transition=False),
+                CoTStep(2, 130, 1.45, 0.30, intermediate_answer="99", is_overthinking_transition=True),
+                CoTStep(3, 160, 1.10, 0.45, intermediate_answer="99", is_overthinking_transition=False),
+            ],
+        )
+        trunc = dec.truncate_trace_online(trace)
+        self.assertTrue(trunc.was_l_stopped)
+        self.assertEqual(trunc.extracted_answer, "42")
+        self.assertAlmostEqual(trunc.effective_raw_confidence, 0.91, places=4)
+        self.assertAlmostEqual(trunc.effective_mean_entropy, 0.225, places=4)
+
 
 if __name__ == "__main__":
     unittest.main()

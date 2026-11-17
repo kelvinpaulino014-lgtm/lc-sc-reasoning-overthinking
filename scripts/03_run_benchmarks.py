@@ -20,6 +20,8 @@ import pandas as pd
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss, roc_auc_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / "results"
@@ -89,13 +91,13 @@ def fit_calibration_on_validation(df_val: pd.DataFrame) -> Dict[str, Any]:
     ]
     l_star = float(opt_subset["total_tokens"].median()) if len(opt_subset) > 0 else 140.0
     sigma_l = float(max(35.0, opt_subset["total_tokens"].std() * 1.35)) if len(opt_subset) > 0 else 55.0
-    l_min = float(max(45.0, l_star * 0.52))
+    l_min = float(max(45.0, l_star * 0.50))
 
     # 2. Estimar janela ótima de comprimento para Wu et al. (2026) Length-Filtered Vote
     l_window_low = float(max(55.0, l_star - 1.15 * sigma_l))
     l_window_high = float(l_star + 1.15 * sigma_l)
 
-    # 3. Estimar limiar de pico de entropia tau_H para o L-Stopping
+    # 3. Estimar limiar de pico de entropia tau_H para o L-Stopping (sem teto artificial de 0.76)
     conv_entropies = []
     over_entropies = []
     for _, row in df_val.iterrows():
@@ -109,14 +111,30 @@ def fit_calibration_on_validation(df_val: pd.DataFrame) -> Dict[str, Any]:
     if conv_entropies and over_entropies:
         tau_h = float(0.55 * np.percentile(conv_entropies, 85) + 0.45 * np.percentile(over_entropies, 25))
     else:
-        tau_h = 0.68
-    tau_h = float(np.clip(tau_h, 0.58, 0.76))
+        tau_h = 0.95
+    tau_h = float(np.clip(tau_h, 0.75, 1.25))
 
     # 4. Ajustar Regressão Isotônica para CaTS (apenas confiança bruta)
     iso_cats = IsotonicRegression(y_min=0.05, y_max=0.98, out_of_bounds="clip")
     iso_cats.fit(df_val["raw_confidence"].values, df_val["is_correct_full"].values)
 
-    # 5. Ajustar Calibrador Consciente de Comprimento/Entropia para LC-SC
+    # 5. Ajustar Calibrador Multi-Feature Pós-L-Stopping para LC-SC (Fase 2)
+    X_trace_val, y_trace_val = [], []
+    for _, row in df_val.iterrows():
+        ans_s, tok_s, conf_s, ent_s, was_t = apply_online_l_stopping(row, l_min=l_min, tau_h=tau_h)
+        X_trace_val.append([
+            conf_s,
+            ent_s,
+            float(was_t),
+            tok_s / max(1.0, l_star),
+            max(0.0, tok_s - l_star) / max(1.0, sigma_l),
+        ])
+        y_trace_val.append(int(ans_s == str(row["gold_answer"])))
+
+    trace_clf_lcsc = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=500))
+    trace_clf_lcsc.fit(np.asarray(X_trace_val, dtype=float), np.asarray(y_trace_val, dtype=int))
+
+    # Manter iso_lcsc legado para compatibilidade
     eff_score_val = df_val["raw_confidence"].values * np.exp(
         -0.35 * np.maximum(0.0, df_val["mean_entropy"].values - 0.35)
     )
@@ -132,6 +150,7 @@ def fit_calibration_on_validation(df_val: pd.DataFrame) -> Dict[str, Any]:
         "tau_h": round(tau_h, 4),
         "iso_cats": iso_cats,
         "iso_lcsc": iso_lcsc,
+        "trace_clf_lcsc": trace_clf_lcsc,
     }
 
 
@@ -139,30 +158,45 @@ def apply_online_l_stopping(
     row: pd.Series,
     l_min: float,
     tau_h: float,
+    window: int = 2,
 ) -> Tuple[str, int, float, float, bool]:
     """
-    Executa a poda intratrilha online (L-Stopping) sobre os passos da cadeia CoT:
+    Executa a poda intratrilha online (L-Stopping) com janela causal de entropia:
     Quando a cadeia já ultrapassou L_min, possui resposta intermediária candidata válida
-    e apresenta um pico de entropia de Shannon (step_entropy > tau_H), interrompe a
-    geração naquele passo antes que a sobrecorreção degrade a resposta.
+    e apresenta pico na média móvel de entropia (> tau_H) ou transição de overthinking,
+    interrompe a geração naquele passo e retorna estatísticas dos passos limpos anteriores.
     """
     steps = json.loads(row["steps_json"])
     last_valid_ans = None
+    clean_confs: List[float] = []
+    clean_ents: List[float] = []
+    ent_window: List[float] = []
 
     for st in steps:
-        if st.get("intermediate_answer"):
-            last_valid_ans = str(st["intermediate_answer"])
         cum_tok = int(st["cumulative_tokens"])
         step_h = float(st["step_entropy"])
+        step_c = float(st["step_confidence"])
+        ent_window.append(step_h)
+        if len(ent_window) > window:
+            ent_window.pop(0)
+        avg_h = sum(ent_window) / len(ent_window)
+        is_over = bool(st.get("is_overthinking_transition", False))
 
-        if cum_tok >= l_min and last_valid_ans is not None and (step_h > tau_h or st.get("is_overthinking_transition", False)):
-            # Truncamento online acionado! Retornamos a resposta candidata pré-sobrecorreção
+        if (
+            cum_tok >= l_min
+            and last_valid_ans is not None
+            and (avg_h > tau_h or step_h > tau_h * 1.15 or (is_over and step_h >= 0.85 * tau_h))
+        ):
             ans_trunc = str(row["midway_answer"]) if row.get("midway_answer") else last_valid_ans
             used_tokens = int(min(row["total_tokens"], max(l_min, cum_tok)))
-            # Confiança e entropia medidas até o instante da parada precoce
-            conf_at_stop = float(st["step_confidence"])
-            ent_at_stop = float(np.mean([s["step_entropy"] for s in steps if s["step_idx"] <= st["step_idx"]]))
+            conf_at_stop = float(np.mean(clean_confs)) if clean_confs else step_c
+            ent_at_stop = float(np.mean(clean_ents)) if clean_ents else step_h
             return ans_trunc, used_tokens, conf_at_stop, ent_at_stop, True
+
+        if st.get("intermediate_answer"):
+            last_valid_ans = str(st["intermediate_answer"])
+        clean_confs.append(step_c)
+        clean_ents.append(step_h)
 
     return (
         str(row["final_answer"]),
@@ -178,8 +212,8 @@ def evaluate_method_on_questions(
     calib: Dict[str, Any],
     method_type: str,
     n_budget: int = 16,
-    gamma_consensus: float = 0.72,
-    lambda_len: float = 0.65,
+    gamma_consensus: float = 0.78,
+    lambda_len: float = 0.85,
 ) -> Dict[str, Any]:
     """
     Avalia um método de decodificação no conjunto de teste com orçamento máximo n_budget.
@@ -291,7 +325,9 @@ def evaluate_method_on_questions(
             c_hats_by_ans: Dict[str, List[float]] = defaultdict(list)
             toks = 0
             used_n = 0
-            n_min_lcsc = min(6, n_budget)
+            n_trunc_q = 0
+            ents_q: List[float] = []
+            n_min_lcsc = min(3, n_budget)
 
             for idx_i, (_, row) in enumerate(df_sub.iterrows()):
                 used_n += 1
@@ -301,6 +337,7 @@ def evaluate_method_on_questions(
                     )
                     if was_trunc:
                         truncated_traces_count += 1
+                        n_trunc_q += 1
                         if ans_i == gold and str(row["final_answer"]) != gold:
                             rescued_count += 1
                 else:
@@ -311,6 +348,7 @@ def evaluate_method_on_questions(
                     was_trunc = False
 
                 toks += used_tok_i
+                ents_q.append(ent_i)
 
                 if method_type == "lc_sc_no_len_penalty":
                     # Sem penalização de comprimento/entropia (lambda=0): usa confiança bruta sem amortecimento L
@@ -324,12 +362,22 @@ def evaluate_method_on_questions(
                     w_i = c_hat_i * len_decay
                     c_hats_by_ans[ans_i].append(c_hat_i * (0.75 + 0.25 * len_decay))
                 else:
-                    eff_feat = np.array([conf_raw_i * math.exp(-0.35 * max(0.0, ent_i - 0.35))])
-                    c_hat_i = float(iso_lcsc.predict(eff_feat)[0])
+                    if "trace_clf_lcsc" in calib:
+                        feat_i = np.array([[
+                            conf_raw_i,
+                            ent_i,
+                            float(was_trunc),
+                            used_tok_i / max(1.0, l_star),
+                            max(0.0, used_tok_i - l_star) / max(1.0, sigma_l),
+                        ]])
+                        c_hat_i = float(calib["trace_clf_lcsc"].predict_proba(feat_i)[0, 1])
+                    else:
+                        eff_feat = np.array([conf_raw_i * math.exp(-0.35 * max(0.0, ent_i - 0.35))])
+                        c_hat_i = float(iso_lcsc.predict(eff_feat)[0])
                     if use_l_stop and was_trunc:
                         dev_tokens = 0.0
                     elif used_tok_i < l_min:
-                        dev_tokens = 1.8 * (l_star - used_tok_i)
+                        dev_tokens = 1.5 * (l_star - used_tok_i)
                     else:
                         dev_tokens = max(0.0, used_tok_i - l_star)
                     len_decay = math.exp(-eff_lambda * dev_tokens / sigma_l)
@@ -343,19 +391,25 @@ def evaluate_method_on_questions(
                     total_w = sum(weighted_votes.values())
                     top_ans = max(weighted_votes, key=weighted_votes.get)
                     top_c_mean = float(np.mean(c_hats_by_ans[top_ans])) if c_hats_by_ans[top_ans] else 0.5
-                    if total_w > 0 and (weighted_votes[top_ans] / total_w) >= 0.80 and top_c_mean >= 0.88:
+                    if total_w > 0 and (weighted_votes[top_ans] / total_w) >= gamma_consensus and top_c_mean >= 0.72:
                         break
 
             pred = max(weighted_votes, key=weighted_votes.get)
             total_w = max(1e-6, sum(weighted_votes.values()))
-            consensus_ratio = float(weighted_votes[pred] / total_w)
+            sorted_w = sorted(weighted_votes.values(), reverse=True)
+            consensus_ratio = float(sorted_w[0] / total_w)
+            margin_ratio = float((sorted_w[0] - (sorted_w[1] if len(sorted_w) > 1 else 0.0)) / total_w)
             mean_c_pred = float(np.mean(c_hats_by_ans[pred])) if c_hats_by_ans[pred] else 0.5
-            r0_conf = float(df_sub.iloc[0]["raw_confidence"])
-            mean_raw_used = float(df_sub.iloc[:used_n]["raw_confidence"].mean())
-            if method_type == "lc_sc" and "q_iso_lcsc" in calib:
-                raw_s = 0.70 * r0_conf + 0.30 * mean_raw_used
-                iso_p = float(calib["q_iso_lcsc"].predict([raw_s])[0])
-                conf = float(np.clip(0.38 * iso_p + 0.62 * raw_s, 0.25, 0.96))
+            if method_type == "lc_sc" and "q_clf_lcsc" in calib:
+                q_feat = np.array([[
+                    consensus_ratio,
+                    margin_ratio,
+                    mean_c_pred,
+                    n_trunc_q / max(1, used_n),
+                    used_n / float(max(1, n_budget)),
+                    float(np.mean(ents_q)) if ents_q else 0.5,
+                ]])
+                conf = float(np.clip(calib["q_clf_lcsc"].predict_proba(q_feat)[0, 1], 0.02, 0.98))
             else:
                 conf = float(np.clip(0.55 * consensus_ratio + 0.45 * mean_c_pred, 0.15, 0.97))
 
@@ -423,42 +477,66 @@ def run_dataset_benchmark(df: pd.DataFrame, ds_name: str) -> Dict[str, Any]:
         qid: group.sort_values("sample_idx") for qid, group in df_test.groupby("question_id", sort=False)
     }
 
-    # Ajustar calibração isotônica regularizada ao nível de questão na validação (zero data leakage)
-    val_scores, val_corrs = [], []
+    # Ajustar calibrador logístico regularizado ao nível de questão na validação (zero data leakage)
+    Xq_val, yq_val = [], []
     for qid, df_q in grouped_val.items():
         gold = str(df_q.iloc[0]["gold_answer"])
-        r0_conf = float(df_q.iloc[0]["raw_confidence"])
         w_votes: Dict[str, float] = defaultdict(float)
+        c_by_a: Dict[str, List[float]] = defaultdict(list)
         used_n_val = 0
+        n_trunc_val = 0
+        ents_val: List[float] = []
         for idx_i, (_, row) in enumerate(df_q.iterrows()):
             used_n_val += 1
             ans_i, used_tok_i, conf_raw_i, ent_i, was_trunc = apply_online_l_stopping(
                 row, l_min=calib["l_min"], tau_h=calib["tau_h"]
             )
-            eff_feat = np.array([conf_raw_i * math.exp(-0.35 * max(0.0, ent_i - 0.35))])
-            c_hat_i = float(calib["iso_lcsc"].predict(eff_feat)[0])
+            if was_trunc:
+                n_trunc_val += 1
+            ents_val.append(ent_i)
+            feat_i = np.array([[
+                conf_raw_i,
+                ent_i,
+                float(was_trunc),
+                used_tok_i / max(1.0, calib["l_star"]),
+                max(0.0, used_tok_i - calib["l_star"]) / max(1.0, calib["sigma_l"]),
+            ]])
+            c_hat_i = float(calib["trace_clf_lcsc"].predict_proba(feat_i)[0, 1])
             if was_trunc:
                 dev_tokens = 0.0
             elif used_tok_i < calib["l_min"]:
-                dev_tokens = 1.8 * (calib["l_star"] - used_tok_i)
+                dev_tokens = 1.5 * (calib["l_star"] - used_tok_i)
             else:
                 dev_tokens = max(0.0, used_tok_i - calib["l_star"])
-            len_decay = math.exp(-0.65 * dev_tokens / calib["sigma_l"])
+            len_decay = math.exp(-0.85 * dev_tokens / calib["sigma_l"])
             tail_decay = 0.72 if idx_i >= 10 else 1.0
             w_votes[ans_i] += c_hat_i * len_decay * tail_decay
-            if used_n_val >= 6:
+            c_by_a[ans_i].append(c_hat_i * (0.75 + 0.25 * len_decay))
+            if used_n_val >= 3:
                 tot_w = sum(w_votes.values())
                 top_a = max(w_votes, key=w_votes.get)
-                if tot_w > 0 and (w_votes[top_a] / tot_w) >= 0.85:
+                top_c = float(np.mean(c_by_a[top_a]))
+                if tot_w > 0 and (w_votes[top_a] / tot_w) >= 0.78 and top_c >= 0.72:
                     break
         pred = max(w_votes, key=w_votes.get)
-        mean_raw_used = float(df_q.iloc[:used_n_val]["raw_confidence"].mean())
-        val_scores.append(0.70 * r0_conf + 0.30 * mean_raw_used)
-        val_corrs.append(int(pred == gold))
+        tot_w = max(1e-6, sum(w_votes.values()))
+        sw = sorted(w_votes.values(), reverse=True)
+        cr = float(sw[0] / tot_w)
+        mr = float((sw[0] - (sw[1] if len(sw) > 1 else 0.0)) / tot_w)
+        mc = float(np.mean(c_by_a[pred])) if c_by_a[pred] else 0.5
+        Xq_val.append([
+            cr,
+            mr,
+            mc,
+            n_trunc_val / max(1, used_n_val),
+            used_n_val / 16.0,
+            float(np.mean(ents_val)) if ents_val else 0.5,
+        ])
+        yq_val.append(int(pred == gold))
 
-    q_iso_lcsc = IsotonicRegression(y_min=0.10, y_max=0.98, out_of_bounds="clip")
-    q_iso_lcsc.fit(np.array(val_scores), np.array(val_corrs))
-    calib["q_iso_lcsc"] = q_iso_lcsc
+    q_clf_lcsc = make_pipeline(StandardScaler(), LogisticRegression(C=0.5, max_iter=500))
+    q_clf_lcsc.fit(np.asarray(Xq_val, dtype=float), np.asarray(yq_val, dtype=int))
+    calib["q_clf_lcsc"] = q_clf_lcsc
 
     main_methods_spec = [
         ("Greedy CoT (N=1)", "greedy", 1),
