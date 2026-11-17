@@ -3,7 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[portuguese]{babel}
-\usepackage[margin=2.0cm,top=2.2cm,bottom=2.2cm]{geometry}
+\usepackage[margin=1.8cm,top=2.1cm,bottom=2.1cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{array}
@@ -22,14 +22,14 @@
 \pagestyle{fancy}
 \fancyhf{}
 \lhead{\small\textcolor{mutedgray}{UnB --- PPGI0034 (Redes Neurais e Aprendizagem de Máquina)}}
-\rhead{\small\textcolor{mutedgray}{Projeto 2: Acompanhamento de Progressão}}
+\rhead{\small\textcolor{mutedgray}{Projeto 2: Acompanhamento e Comparativo ICLR 2026}}
 \cfoot{\small\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 
 \title{
   \vspace{-1.0cm}
   \textcolor{unbblue}{\textbf{Acompanhamento Consolidado de Progressão --- Projeto 2}}\\
-  \large Length-Calibrated Self-Consistency (LC-SC) para Mitigação de \emph{Overthinking} em LLMs de Raciocínio\\
+  \large Length-Calibrated Self-Consistency (LC-SC) vs.\ Referências ICLR 2026\\
   \normalsize \textcolor{mutedgray}{Etapas 0--1 $\rightarrow$ Fase 1 $\rightarrow$ Fase 2 $\rightarrow$ Fase 3 $\rightarrow$ Plano da Fase 4}
 }
 \author{
@@ -43,7 +43,7 @@
 \thispagestyle{fancy}
 
 \begin{abstract}
-Este documento consolida a evolução técnica, científica e experimental do \textbf{Projeto 2} (\emph{Length-Calibrated Self-Consistency} --- LC-SC) ao longo de todas as suas etapas executadas até o momento: definição da proposta (04/Nov), coleta de trilhas CoT e \emph{baseline} heurístico (Fase~1), calibração multi-feature e \emph{L-Stopping} causal sem vazamento de dados (Fase~2), treinamento de política neural compacta em PyTorch com benchmark real \emph{online} em GPU na RTX~3050~6GB (Fase~3), além do plano estruturado para a Fase~4. Em regime \emph{offline} completo ($n=200$/dataset, \texttt{DeepSeek-R1-Distill-Qwen-1.5B}), o LC-SC Fase~2 atingiu \textbf{97,0\%} de acurácia no GSM8K (economia de \textbf{80,9\%} de tokens, ECE \textbf{2,50\%}) e \textbf{94,5\%} no MATH-500 (economia de \textbf{77,5\%} de tokens, ECE \textbf{2,68\%}), superando todos os 4 \emph{baselines} de ICLR~2026. Na Fase~3, a política sequencial \texttt{NeuralStoppingPolicy} (\textbf{1.490 parâmetros}, 5-Fold CV $\times$ 5 sementes em \texttt{val\_calibration}) obteve \texttt{stop\_F1} de \textbf{0,9979/0,9976} e ROC-AUC de \textbf{0,9739/0,9821}, e o benchmark real \emph{online} com \texttt{Qwen/Qwen2.5-1.5B-Instruct} atingiu \textbf{70,0\%} no GSM8K (+10,0 p.p.\ sobre Standard SC e CaTS), revelando com transparência o efeito de \emph{domain shift} entre modelos como foco central da Fase~4.
+Este relatório consolida toda a evolução técnica e experimental do \textbf{Projeto 2} (\emph{Length-Calibrated Self-Consistency} --- LC-SC) e apresenta a comparação direta de todos os resultados obtidos até o momento contra os \textbf{4 artigos de referência de ICLR~2026} (Wu et al.\ LFV, Huang et al.\ CaTS, Hao et al.\ $<3$K params e Feng et al.\ In-Place TTT). No benchmark completo \emph{offline} ($n=200$/dataset, \texttt{DeepSeek-R1-Distill-Qwen-1.5B}), o LC-SC Fase~2 atingiu \textbf{97,0\%} de acurácia no GSM8K (economia de \textbf{80,9\%} de tokens, ECE \textbf{2,50\%}, Brier \textbf{0,0017}, ROC-AUC \textbf{100,00\%}) e \textbf{94,5\%} no MATH-500 (economia de \textbf{77,5\%} de tokens, ECE \textbf{2,68\%}, Brier \textbf{0,0028}, ROC-AUC \textbf{100,00\%}), superando Wu et al.\ (LFV) e Huang et al.\ (CaTS) em até \textbf{+24,0 p.p.} de acurácia e \textbf{77,5\%--80,9\%} de redução de tokens. Na Fase~3, a política sequencial \texttt{NeuralStoppingPolicy} (\textbf{1.490 parâmetros}, inspirada em Hao et al.) obteve \texttt{stop\_F1} de \textbf{0,9979/0,9976} em 5-Fold CV $\times$ 5 sementes, e a execução real \emph{online} em GPU (\texttt{Qwen/Qwen2.5-1.5B-Instruct}, RTX~3050~6GB) atingiu \textbf{70,0\%} no GSM8K (+10,0 p.p.\ sobre Standard SC e CaTS), revelando o efeito de \emph{domain shift} como foco central da Fase~4.
 \end{abstract}
 
 \section{Visão Geral e Cronologia das Etapas}
@@ -53,97 +53,183 @@ Este documento consolida a evolução técnica, científica e experimental do \t
 \caption{Linha do tempo consolidada das etapas do Projeto 2.}
 \label{tab:cronologia}
 \small
-\begin{tabular}{@{}p{2.5cm}p{4.3cm}p{8.5cm}@{}}
+\begin{tabular}{@{}p{2.4cm}p{4.1cm}p{9.2cm}@{}}
 \toprule
 \textbf{Etapa / Data} & \textbf{Escopo Principal} & \textbf{Principais Entregas e Marcos Verificados} \\
 \midrule
-\textbf{Etapa 0 \& 1} (04/Nov) & Definição do Tema 2 e Proposta de 1 Página & Levantamento de 4 artigos e 4 repositórios ICLR~2026 (Wu et al.\ LFV, Huang et al.\ CaTS, Hao et al., Feng et al.); entrega oficial de \texttt{proposta\_projeto2\_04nov\_Kelvin\_Buss.pdf}. \\
+\textbf{Etapa 0 \& 1} (04/Nov) & Definição do Tema 2 e Proposta de 1 Página & Levantamento de 4 artigos e 4 repositórios ICLR~2026 (Wu, Huang, Hao, Feng); entrega de \texttt{proposta\_projeto2\_04nov\_Kelvin\_Buss.pdf}. \\
 \addlinespace
-\textbf{Fase 1} & Coleta em GPU, \emph{Baseline} LC-SC Heurístico e Testes & Coleta de \textbf{8.960 trilhas CoT} (\texttt{DeepSeek-R1-Distill-Qwen-1.5B}: 4.480 GSM8K + 4.480 MATH-500); reprodução da curva em U invertido; correção de 6 problemas iniciais de teste (\texttt{02\_Relatorio\_de\_Testes\_e\_Validacao.md}); 31 testes passando; LC-SC \textbf{85,0\%} (GSM8K) e \textbf{85,5\%} (MATH-500). \\
+\textbf{Fase 1} & Coleta GPU + Baseline LC-SC Heurístico & Coleta de \textbf{8.960 trilhas CoT} (\texttt{DeepSeek-R1-Distill-Qwen-1.5B}: 4.480 GSM8K + 4.480 MATH-500); reprodução da curva em U invertido; correção de 6 problemas iniciais de teste (\texttt{02\_Relatorio\_de\_Testes\_e\_Validacao.md}); 31 testes aprovados; LC-SC \textbf{85,0\%} (GSM8K) e \textbf{85,5\%} (MATH-500). \\
 \addlinespace
-\textbf{Fase 2} & Calibração Multi-Feature e \emph{L-Stopping} Causal & Desbloqueio de $\tau_H \in [0{,}75;\, 1{,}25]$; janela causal de 2 passos pré-pico; calibradores \texttt{trace\_clf\_lcsc} e \texttt{q\_clf\_lcsc} em \texttt{val\_calibration}; \emph{N-Stopping} adaptativo; salto para \textbf{97,0\%} (GSM8K, ECE 2,50\%) e \textbf{94,5\%} (MATH-500, ECE 2,68\%). \\
+\textbf{Fase 2} & Calibração Multi-Feature + L-Stopping Causal & Desbloqueio de $\tau_H \in [0{,}75;\, 1{,}25]$; janela causal de 2 passos pré-pico; \texttt{trace\_clf\_lcsc} e \texttt{q\_clf\_lcsc} ajustados estritamente em \texttt{val\_calibration}; \emph{N-Stopping} adaptativo; salto para \textbf{97,0\%} (GSM8K, ECE 2,50\%) e \textbf{94,5\%} (MATH-500, ECE 2,68\%). \\
 \addlinespace
-\textbf{Fase 3} & Política Neural ($<3$K params) e Benchmark Online em GPU & Treinamento PyTorch (\texttt{GRU(6,16)+LayerNorm+MLP}, \textbf{1.490 params}) em 5-Fold CV $\times$ 5 sementes; correção em tempo real via auditoria de 20\,min (\texttt{\_EXPLICIT\_ANSWER\_CUE\_RE}); execução online na RTX~3050~6GB (\texttt{Qwen2.5-1.5B-Instruct}); diagnóstico de \emph{domain shift}; \textbf{35/36} testes aprovados no \texttt{pytest}. \\
+\textbf{Fase 3} & Política Neural ($<3$K params) + GPU Online & Treinamento PyTorch (\texttt{GRU(6,16)+LayerNorm+MLP}, \textbf{1.490 params}) em 5-Fold CV $\times$ 5 sementes; correção via auditoria de 20\,min (\texttt{\_EXPLICIT\_ANSWER\_CUE\_RE}); benchmark online na RTX~3050~6GB (\texttt{Qwen2.5-1.5B-Instruct}); diagnóstico honesto de \emph{domain shift}; \textbf{35/36} no \texttt{pytest}. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Evolução Técnica por Fase}
+\section{Comparação Experimental Direta vs.\ Baselines ICLR 2026 (Split \texttt{test}, $n=200$)}
 
-\subsection{Etapas 0 e 1: Fundamentação ICLR 2026 e Proposta}
-O projeto foi estruturado em torno do fenômeno de \emph{overthinking} em modelos de raciocínio compacto (1,5B), onde cadeias excessivamente longas degradam a acurácia e desperdiçam orçamento computacional. A revisão inicial reuniu quatro referências de ICLR~2026: \emph{Length-Filtered Vote} (Wu et al., 2026), \emph{CaTS} (Huang et al., 2026), políticas neurais de parada (Hao et al., 2026) e dinâmicas de entropia/calibração (Feng et al., 2026), formalizadas na proposta entregue em 04/Nov.
+As Tabelas~\ref{tab:comp_gsm8k} e~\ref{tab:comp_math} apresentam os resultados completos no split \texttt{test} ($n=200$ questões por dataset, \texttt{DeepSeek-R1-Distill-Qwen-1.5B}), contrastando diretamente os métodos de referência com as Fases~1 e~2 do LC-SC:
 
-\subsection{Fase 1: Coleta de 8.960 Trilhas CoT e Baseline LC-SC Heurístico}
-Foram geradas 8.960 trilhas completas em GPU (4.480 para GSM8K e 4.480 para MATH-500, com partição estrita entre \texttt{val\_calibration} e \texttt{test}). A suíte inicial corrigiu 6 gargalos estruturais documentados em \texttt{docs/02\_Relatorio\_de\_Testes\_e\_Validacao.md}, estabilizando 31 testes unitários e de invariantes científicos. Nessa fase, o decodificador LC-SC heurístico alcançou \textbf{85,0\%} de acurácia no GSM8K (1.098,3 tokens médios; 69,0\% de economia; ECE 6,60\%; ROC-AUC 91,80\%) e \textbf{85,5\%} no MATH-500 (1.648,3 tokens médios; 65,1\% de economia; ECE 8,19\%; ROC-AUC 82,80\%).
-
-\subsection{Fase 2: Calibração Multi-Feature e L-Stopping Causal (Zero Data Leakage)}
-A auditoria diagnóstica da Fase~2 identificou quatro gargalos na versão heurística: (i) teto artificial de $\tau_H$ em $0{,}76$, (ii) leitura ruidosa de confiança/entropia exatamente no passo de pico, (iii) fórmula exponencial fixa de confiança por traço e (iv) limiares rígidos de \emph{N-Stopping} ($n_{\min}=6$). As correções aplicadas --- todas ajustadas estritamente via 5-Fold CV em \texttt{val\_calibration} e avaliadas uma única vez em \texttt{test} --- incluíram:
 \begin{itemize}[leftmargin=1.4em,itemsep=2pt]
-  \item \textbf{Desbloqueio de $\tau_H$ e Janela Causal Pré-Pico:} expansão de $\tau_H$ para $[0{,}75;\, 1{,}25]$ ($\tau_H = 1{,}2133$ no GSM8K e $1{,}2318$ no MATH-500) com janela causal de 2 passos e extração das médias limpas pré-pico (\texttt{conf\_at\_stop}, \texttt{ent\_at\_stop}), resgatando \textbf{165} sobrecorreções no GSM8K e \textbf{170} no MATH-500.
-  \item \textbf{Calibrador Pós-\emph{L-Stopping} (\texttt{trace\_clf\_lcsc}):} \texttt{StandardScaler + LogisticRegression(C=1.0)} sobre 5 features (\texttt{conf\_stop}, \texttt{ent\_stop}, \texttt{was\_trunc}, \texttt{tok/l\_star}, \texttt{excess\_tok/sigma\_l}).
-  \item \textbf{\emph{N-Stopping} Adaptativo e Calibrador de Questão (\texttt{q\_clf\_lcsc}):} ajuste de $n_{\min}=3$, $\gamma=0{,}78$, $\lambda=0{,}85$ e regressão logística (\texttt{C=0.5}) sobre 6 features agregadas da questão.
+  \item \textbf{Wu et al.\ (ICLR 2026) --- \emph{Length-Filtered Vote} (LFV):} baseado na hipótese \emph{When More is Less} (curva em U invertido entre comprimento de raciocínio e acurácia), filtra traços excessivamente longos apenas \emph{post-hoc}. Como a filtragem ocorre após a geração completa de todas as $N=16$ amostras, \textbf{o método continua pagando 100\% do custo de tokens} (3.537,4 tokens no GSM8K e 4.726,2 no MATH-500; economia de 0,0\%).
+  \item \textbf{Huang et al.\ (ICLR 2026) --- \emph{CaTS} (Calibrated Test-Time Scaling):} aplica parada antecipada apenas no eixo do número de amostras $N$ via confiança calibrada ($N=11{,}09$ no GSM8K; $N=11{,}27$ no MATH-500), obtendo economia moderada de tokens (31,9\% e 30,5\%), porém \textbf{sem interromper o \emph{overthinking} intra-traço no eixo de comprimento $L$}.
+  \item \textbf{LC-SC (Proposto --- Fases 1 e 2):} atua conjuntamente nos dois eixos ($L$-Stopping causal por entropia + penalização calibrada de excesso de comprimento + $N$-Stopping adaptativo). Na Fase~2, o desbloqueio de $\tau_H$ ($1{,}2133$ no GSM8K; $1{,}2318$ no MATH-500) com janela causal de 2 passos pré-pico resgatou \textbf{165} sobrecorreções no GSM8K e \textbf{170} no MATH-500.
 \end{itemize}
-O resultado elevou a acurácia no \texttt{test} para \textbf{97,0\%} no GSM8K (676,5 tokens; $N=4{,}56$; ECE \textbf{2,50\%}; Brier \textbf{0,0017}; ROC-AUC \textbf{100,00\%}) e \textbf{94,5\%} no MATH-500 (1.065,5 tokens; $N=4{,}87$; ECE \textbf{2,68\%}; Brier \textbf{0,0028}; ROC-AUC \textbf{100,00\%}), dominando a fronteira de Pareto (Figura~\ref{fig:pareto_p2}).
+
+\begin{table}[H]
+\centering
+\caption{Comparação completa no \textbf{GSM8K} (split \texttt{test}, $n=200$).}
+\label{tab:comp_gsm8k}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+\textbf{Método} & \textbf{Acc (\%)} & \textbf{IC 95\% (\%)} & \textbf{Tokens Méd.} & \textbf{Econ.\ vs SC (\%)} & \textbf{$N$ Méd.} & \textbf{ECE (\%)} & \textbf{Brier / ROC-AUC (\%)} \\
+\midrule
+Greedy CoT ($N=1$) & 64,0 & [57,0; 70,51] & 178,4 & 95,0 & 1,00 & 17,86 & 0,1957 / 72,40 \\
+Standard SC (Aula 11, $N=16$) & 75,0 & [69,5; 81,0] & 3537,4 & 0,0 & 16,00 & 20,33 & 0,1635 / 52,33 \\
+Length-Filtered Vote (Wu et al., 2026) & 80,0 & [75,0; 85,01] & 3537,4 & 0,0 & 16,00 & 9,92 & 0,1247 / 82,72 \\
+CaTS (Huang et al., 2026) & 80,0 & [74,49; 85,5] & 2409,2 & 31,9 & 11,09 & 13,46 & 0,1345 / 80,38 \\
+\midrule
+LC-SC Fase 1 (Heurístico) & 85,0 & --- & 1098,3 & 69,0 & 8,79 & 6,60 & --- / 91,80 \\
+\textbf{LC-SC Fase 2 (Proposto)} & \textbf{97,0} & \textbf{[94,5; 99,0]} & \textbf{676,5} & \textbf{80,9} & \textbf{4,56} & \textbf{2,50} & \textbf{0,0017 / 100,00} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Comparação completa no \textbf{MATH-500} (split \texttt{test}, $n=200$).}
+\label{tab:comp_math}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+\textbf{Método} & \textbf{Acc (\%)} & \textbf{IC 95\% (\%)} & \textbf{Tokens Méd.} & \textbf{Econ.\ vs SC (\%)} & \textbf{$N$ Méd.} & \textbf{ECE (\%)} & \textbf{Brier / ROC-AUC (\%)} \\
+\midrule
+Greedy CoT ($N=1$) & 57,0 & [50,0; 64,0] & 261,4 & 94,5 & 1,00 & 22,94 & 0,2204 / 78,60 \\
+Standard SC (Aula 11, $N=16$) & 63,5 & [57,0; 71,0] & 4726,2 & 0,0 & 16,00 & 19,83 & 0,2372 / 42,50 \\
+Length-Filtered Vote (Wu et al., 2026) & 70,5 & [64,0; 76,5] & 4726,2 & 0,0 & 16,00 & 15,94 & 0,1863 / 76,85 \\
+CaTS (Huang et al., 2026) & 71,5 & [65,49; 78,5] & 3285,3 & 30,5 & 11,27 & 12,01 & 0,1791 / 74,59 \\
+\midrule
+LC-SC Fase 1 (Heurístico) & 85,5 & --- & 1648,3 & 65,1 & 9,46 & 8,19 & --- / 82,80 \\
+\textbf{LC-SC Fase 2 (Proposto)} & \textbf{94,5} & \textbf{[91,5; 97,5]} & \textbf{1065,5} & \textbf{77,5} & \textbf{4,87} & \textbf{2,68} & \textbf{0,0028 / 100,00} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Ganhos ($\Delta$) do \textbf{LC-SC Fase 2} sobre cada \emph{baseline} de referência.}
+\label{tab:deltas}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lcccccccc@{}}
+\toprule
+ & \multicolumn{4}{c}{\textbf{GSM8K ($\Delta$ LC-SC Fase 2 vs.\ Baseline)}} & \multicolumn{4}{c}{\textbf{MATH-500 ($\Delta$ LC-SC Fase 2 vs.\ Baseline)}} \\
+\cmidrule(lr){2-5} \cmidrule(lr){6-9}
+\textbf{Baseline Comparado} & \textbf{$\Delta$ Acc} & \textbf{Red.\ Tokens} & \textbf{$\Delta$ ECE} & \textbf{$\Delta$ AUC} & \textbf{$\Delta$ Acc} & \textbf{Red.\ Tokens} & \textbf{$\Delta$ ECE} & \textbf{$\Delta$ AUC} \\
+\midrule
+Greedy CoT ($N=1$) & +33,0 p.p. & --- & $-$15,36 p.p. & +27,60 p.p. & +37,5 p.p. & --- & $-$20,26 p.p. & +21,40 p.p. \\
+Standard SC ($N=16$) & +22,0 p.p. & 80,9\% ($-$2860,9) & $-$17,83 p.p. & +47,67 p.p. & +31,0 p.p. & 77,5\% ($-$3660,7) & $-$17,15 p.p. & +57,50 p.p. \\
+Wu et al.\ LFV (2026) & +17,0 p.p. & 80,9\% ($-$2860,9) & $-$7,42 p.p. & +17,28 p.p. & +24,0 p.p. & 77,5\% ($-$3660,7) & $-$13,26 p.p. & +23,15 p.p. \\
+Huang et al.\ CaTS (2026) & +17,0 p.p. & 71,9\% ($-$1732,7) & $-$10,96 p.p. & +19,62 p.p. & +23,0 p.p. & 67,6\% ($-$2219,8) & $-$9,33 p.p. & +25,41 p.p. \\
+LC-SC Fase 1 & +12,0 p.p. & 38,4\% ($-$421,8) & $-$4,10 p.p. & +8,20 p.p. & +9,0 p.p. & 35,4\% ($-$582,8) & $-$5,51 p.p. & +17,20 p.p. \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.82\linewidth]{../results/figures/fig3_pareto_frontier.png}
-\caption{Fronteira de Pareto (Acurácia vs.\ Consumo de Tokens) obtida na Fase~2 em comparação aos \emph{baselines} de ICLR~2026.}
+\includegraphics[width=0.78\linewidth]{../results/figures/fig3_pareto_frontier.png}
+\caption{Fronteira de Pareto (Acurácia vs.\ Tokens) da Fase~2 frente aos \emph{baselines} de ICLR~2026.}
 \label{fig:pareto_p2}
 \end{figure}
 
-\subsection{Fase 3: Política Neural Compacta (1.490 Params) e Benchmark Real Online em GPU}
-Na Parte~A (\texttt{src/models/stopping\_policy.py}, \texttt{scripts/02b\_train\_stopping\_policy.py}), foi treinada uma política sequencial \texttt{GRU(6,16) + LayerNorm(16) + Linear(16,16) + SiLU + Dropout(0.1) + Linear(16,2)} com apenas \textbf{1.490 parâmetros} ($< 3.000$) em 5-Fold CV $\times$ 5 sementes (\texttt{[42, 101, 2026, 777, 999]}) sobre \texttt{val\_calibration} (80 questões / 1.280 traços por dataset). Os resultados médios de validação foram:
-\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
-  \item \textbf{GSM8K ($L^*=134{,}0$):} \texttt{val\_loss} $= 0{,}1104 \pm 0{,}0095$, \texttt{stop\_F1} $= 0{,}9979 \pm 0{,}0015$, \texttt{Brier} $= 0{,}0456 \pm 0{,}0044$, \texttt{AUC} $= 0{,}9739 \pm 0{,}0073$.
-  \item \textbf{MATH-500 ($L^*=211{,}4$):} \texttt{val\_loss} $= 0{,}0845 \pm 0{,}0070$, \texttt{stop\_F1} $= 0{,}9976 \pm 0{,}0018$, \texttt{Brier} $= 0{,}0340 \pm 0{,}0046$, \texttt{AUC} $= 0{,}9821 \pm 0{,}0027$.
-\end{itemize}
+\section{Estudo de Ablação (\texttt{NoLStop}, \texttt{NoNStop}, \texttt{NoLenPenalty})}
 
-Na Parte~B (\texttt{scripts/03b\_run\_online\_gpu\_benchmark.py}), a política foi acoplada a \texttt{transformers.StoppingCriteria} (\texttt{EntropyNeuralStoppingCriteria}) rodando \texttt{Qwen/Qwen2.5-1.5B-Instruct} (FP16) na GPU \textbf{RTX~3050~6GB} ($n=10$/dataset, \texttt{max\_new\_tokens=384}). A auditoria periódica de 20 minutos detectou inicialmente 0,0\% de acurácia por disparo prematuro em números intermediários; a correção com \texttt{\_EXPLICIT\_ANSWER\_CUE\_RE} (exigindo \verb|\boxed{...}|, \verb|####| ou \emph{Therefore, the answer is}) e o novo teste \texttt{test\_incomplete\_cot\_does\_not\_stop\_prematurely} resolveram o problema.
+A Tabela~\ref{tab:ablacao} extrai os resultados exatos de ablação de \texttt{results/benchmark\_results.json}, demonstrando que cada componente do LC-SC é indispensável: remover o \emph{L-Stopping} derruba a acurácia em $-14{,}5$ p.p.\ (GSM8K) e $-22{,}5$ p.p.\ (MATH-500) e zera a economia de tokens; remover o \emph{N-Stopping} eleva o consumo de tokens em $3{,}48\times$ (GSM8K) e $3{,}28\times$ (MATH-500); e remover a penalização de comprimento ($\lambda=0$) degrada a acurácia para $80{,}0\%$ / $70{,}5\%$ e o ECE para $17{,}81\%$ / $24{,}05\%$.
+
+\begin{table}[H]
+\centering
+\caption{Ablação dos mecanismos do LC-SC Fase~2 (\texttt{results/benchmark\_results.json}).}
+\label{tab:ablacao}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lcccccccccc@{}}
+\toprule
+ & \multicolumn{5}{c}{\textbf{GSM8K}} & \multicolumn{5}{c}{\textbf{MATH-500}} \\
+\cmidrule(lr){2-6} \cmidrule(lr){7-11}
+\textbf{Variante} & \textbf{Acc (\%)} & \textbf{Tok} & \textbf{Econ.} & \textbf{ECE (\%)} & \textbf{Brier} & \textbf{Acc (\%)} & \textbf{Tok} & \textbf{Econ.} & \textbf{ECE (\%)} & \textbf{Brier} \\
+\midrule
+\textbf{LC-SC Completo (Fase 2)} & \textbf{97,0} & \textbf{676,5} & \textbf{80,9\%} & \textbf{2,50} & \textbf{0,0017} & \textbf{94,5} & \textbf{1065,5} & \textbf{77,5\%} & \textbf{2,68} & \textbf{0,0028} \\
+s/ L-Stopping (\texttt{NoLStop}) & 82,5 & 3537,4 & 0,0\% & 25,08 & 0,1173 & 72,0 & 4726,2 & 0,0\% & 25,17 & 0,1401 \\
+s/ N-Stopping (\texttt{NoNStop}) & 97,0 & 2355,1 & 33,4\% & 6,77 & 0,0137 & 94,5 & 3497,1 & 26,0\% & 6,40 & 0,0157 \\
+s/ Penalização L ($\lambda=0$) & 80,0 & 887,9 & 74,9\% & 17,81 & 0,0911 & 70,5 & 1571,1 & 66,8\% & 24,05 & 0,1249 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Comparação com Hao et al.\ (ICLR 2026) e Feng et al.\ (ICLR 2026 Oral)}
+
+Além dos \emph{baselines} de votação e parada por confiança (Wu et al.\ e CaTS), a Fase~3 estabeleceu paralelo direto com as duas abordagens de controle dinâmico de ICLR~2026:
+
+\begin{enumerate}[leftmargin=1.4em,itemsep=3pt]
+  \item \textbf{Hao et al.\ (ICLR 2026 --- \emph{RL of Thoughts}, $<3$K params) vs.\ LC-SC Fase 3 Parte A (\texttt{NeuralStoppingPolicy}, 1.490 params):} Hao et al.\ propõem um navegador de inferência ultracompacto ($<3.000$ parâmetros) treinado para decidir ações de raciocínio passo a passo. De forma análoga, implementamos em \texttt{src/models/stopping\_policy.py} uma arquitetura \texttt{GRU(6,16) + LayerNorm(16) + Linear(16,16) + SiLU + Dropout(0.1) + Linear(16,2)} com apenas \textbf{1.490 parâmetros treináveis}, ajustada via 5-Fold CV $\times$ 5 sementes (\texttt{[42, 101, 2026, 777, 999]}) exclusivamente em \texttt{val\_calibration} (80 questões / 1.280 traços por dataset):
+  \begin{itemize}[leftmargin=1.2em,itemsep=1pt]
+    \item \textbf{GSM8K ($L^*=134{,}0$):} \texttt{val\_loss} $= 0{,}1104 \pm 0{,}0095$, \texttt{stop\_F1} $= 0{,}9979 \pm 0{,}0015$, \texttt{Brier} $= 0{,}0456 \pm 0{,}0044$, \texttt{ROC-AUC} $= 0{,}9739 \pm 0{,}0073$.
+    \item \textbf{MATH-500 ($L^*=211{,}4$):} \texttt{val\_loss} $= 0{,}0845 \pm 0{,}0070$, \texttt{stop\_F1} $= 0{,}9976 \pm 0{,}0018$, \texttt{Brier} $= 0{,}0340 \pm 0{,}0046$, \texttt{ROC-AUC} $= 0{,}9821 \pm 0{,}0027$.
+  \end{itemize}
+  \item \textbf{Feng et al.\ (ICLR 2026 Oral --- \emph{In-Place TTT}) vs.\ LC-SC Fase 3 Parte B (Inferência Online em GPU):} Enquanto Feng et al.\ adaptam estados internos do modelo em tempo de teste (exigindo atualização de ativações/pesos), nossa abordagem opera de forma \emph{training-free} sobre o modelo-alvo (\texttt{Qwen/Qwen2.5-1.5B-Instruct} FP16 na RTX~3050~6GB, $n=10$/dataset, \texttt{max\_new\_tokens=384}) via \texttt{EntropyNeuralStoppingCriteria}. Após a correção do critério de pista explícita (\texttt{\_EXPLICIT\_ANSWER\_CUE\_RE}), obtivemos os resultados reais de GPU da Tabela~\ref{tab:gpu_p3}.
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\caption{Benchmark real \emph{online} em GPU (RTX~3050~6GB, \texttt{Qwen/Qwen2.5-1.5B-Instruct} FP16, $n=10$/dataset).}
+\label{tab:gpu_p3}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llccccccccc@{}}
+\toprule
+\textbf{Dataset} & \textbf{Método} & \textbf{Acc (\%)} & \textbf{IC 95\%} & \textbf{Tok} & \textbf{Econ.} & \textbf{$N$} & \textbf{Lat.\ (s/q)} & \textbf{Speedup / tok/s} & \textbf{VRAM (MB)} & \textbf{ECE / Brier / AUC} \\
+\midrule
+GSM8K & Greedy CoT ($N=1$) & 50,0 & [20,0; 80,0] & 317,5 & 86,8\% & 1,0 & 9,98 & 2,41x / 31,8 & 3960,2 & 49,87\% / 0,3912 / 56,00\% \\
+GSM8K & Standard SC ($N=8$) & 60,0 & [30,0; 90,0] & 2406,5 & 0,0\% & 8,0 & 24,04 & 1,00x / 100,1 & 3960,2 & 34,45\% / 0,1845 / 95,83\% \\
+GSM8K & CaTS (Huang et al.) & 60,0 & [30,0; 90,0] & 1971,9 & 18,1\% & 6,4 & 19,93 & 1,21x / 98,9 & 3960,2 & 24,14\% / 0,0910 / 100,00\% \\
+GSM8K & \textbf{LC-SC Fase 3 GPU} & \textbf{70,0} & [40,0; 100,0] & 2501,7 & $-$4,0\% & 8,0 & 24,87 & 0,97x / 100,6 & 3960,2 & 40,52\% / 0,1801 / 90,48\% \\
+\midrule
+MATH-500 & Greedy CoT ($N=1$) & 60,0 & [30,0; 90,0] & 342,8 & 87,7\% & 1,0 & 10,87 & 2,35x / 31,5 & 3930,5 & 41,38\% / 0,3408 / 54,17\% \\
+MATH-500 & Standard SC ($N=8$) & 60,0 & [30,0; 90,0] & 2787,7 & 0,0\% & 8,0 & 25,56 & 1,00x / 109,1 & 3930,5 & 42,61\% / 0,2447 / 54,17\% \\
+MATH-500 & CaTS (Huang et al.) & 40,0 & [10,0; 70,0] & 2300,1 & 17,5\% & 6,4 & 20,93 & 1,22x / 109,9 & 3930,5 & 42,93\% / 0,2418 / 70,83\% \\
+MATH-500 & \textbf{LC-SC Fase 3 GPU} & \textbf{40,0} & [10,0; 70,0] & 2720,8 & 2,4\% & 7,6 & 25,14 & 1,02x / 108,2 & 3930,5 & 46,27\% / 0,2301 / 66,67\% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
 
 \begin{figure}[H]
 \centering
 \begin{minipage}[t]{0.49\linewidth}
   \centering
   \includegraphics[width=\linewidth]{../results/phase3_deep_training/fig_phase3_learning_curves.png}
-  \caption{Curvas de aprendizado multi-seed da \texttt{NeuralStoppingPolicy} (Fase~3, Parte~A).}
+  \caption{Curvas multi-seed da \texttt{NeuralStoppingPolicy} (1.490 params).}
   \label{fig:p3_curves}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.49\linewidth}
   \centering
   \includegraphics[width=\linewidth]{../results/phase3_deep_training/fig_phase3_gpu_latency_pareto.png}
-  \caption{Latência \emph{wall-clock} e acurácia no benchmark real em GPU (Fase~3, Parte~B).}
+  \caption{Latência \emph{wall-clock} vs.\ acurácia na RTX~3050~6GB.}
   \label{fig:p3_gpu}
 \end{minipage}
 \end{figure}
 
-No GSM8K online, o \textbf{LC-SC Fase~3} alcançou \textbf{70,0\%} de acurácia (+10,0 p.p.\ sobre Standard SC e CaTS, que obtiveram 60,0\%), com throughput de \textbf{100,6 tok/s} e pico de VRAM de \textbf{3.960,2 MB}. Entretanto, a análise científica honesta registrou \emph{domain shift} entre as trilhas \texttt{<think>} de \texttt{DeepSeek-R1-Distill} (usadas no treino em \texttt{val\_calibration}) e as respostas diretas de \texttt{Qwen2.5-1.5B-Instruct} (onde \verb|\boxed{...}| surge próximo ao \texttt{EOS}), impedindo o disparo precoce de \emph{N-Stopping} ($N=4$) e elevando o ECE online para 40,52\% (GSM8K) e 46,27\% (MATH-500, onde obteve 40,0\% de acurácia). A suíte \texttt{pytest} encerrou a Fase~3 com \textbf{35/36 testes aprovados} (a única falha esperada deve-se ao congelamento intencional de \texttt{main.tex} e \texttt{slides\_projeto2.tex}).
-
-\section{Comparativo Consolidado: ICLR 2026 $\rightarrow$ Fase 1 $\rightarrow$ Fase 2 $\rightarrow$ Fase 3}
-
-\begin{table}[H]
-\centering
-\caption{Progressão completa de acurácia, consumo de tokens e calibração (ECE).}
-\label{tab:progressao}
-\scriptsize
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{@{}llcccccc@{}}
-\toprule
-\textbf{Etapa / Método} & \textbf{Regime \& Modelo} & \textbf{GSM8K Acc} & \textbf{GSM8K Tok} & \textbf{GSM8K ECE} & \textbf{MATH Acc} & \textbf{MATH Tok} & \textbf{MATH ECE} \\
-\midrule
-Greedy CoT ($N=1$) & Offline (\texttt{DeepSeek}, $n=200$) & 64,0\% & 178,4 & 17,86\% & 57,0\% & 261,4 & 22,94\% \\
-Standard SC (Aula 11) & Offline (\texttt{DeepSeek}, $n=200$) & 75,0\% & 3537,4 & 20,33\% & 63,5\% & 4726,2 & 19,83\% \\
-LFV (Wu et al., 2026) & Offline (\texttt{DeepSeek}, $n=200$) & 80,0\% & 3537,4 & 9,92\% & 70,5\% & 4726,2 & 15,94\% \\
-CaTS (Huang et al., 2026) & Offline (\texttt{DeepSeek}, $n=200$) & 80,0\% & 2409,2 & 13,46\% & 71,5\% & 3285,3 & 12,01\% \\
-\midrule
-\textbf{LC-SC --- Fase 1} & Offline (\texttt{DeepSeek}, $n=200$) & 85,0\% & 1098,3 & 6,60\% & 85,5\% & 1648,3 & 8,19\% \\
-\textbf{LC-SC --- Fase 2} & Offline (\texttt{DeepSeek}, $n=200$) & \textbf{97,0\%} & \textbf{676,5} & \textbf{2,50\%} & \textbf{94,5\%} & \textbf{1065,5} & \textbf{2,68\%} \\
-\textbf{LC-SC --- Fase 3 (Part A)} & GRU 1.490p (\texttt{val\_cal}, 5$\times$5) & --- (F1 0,9979) & --- & Brier 0,0456 & --- (F1 0,9976) & --- & Brier 0,0340 \\
-\textbf{LC-SC --- Fase 3 (Part B)} & Online GPU (\texttt{Qwen2.5}, $n=10$) & 70,0\% & 2501,7 & 40,52\% & 40,0\% & 2720,8 & 46,27\% \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
+\textbf{Diagnóstico Honesto de \emph{Domain Shift}:} Apesar do ganho de +10,0 p.p.\ no GSM8K online ($70{,}0\%$ vs.\ $60{,}0\%$), a GRU foi treinada em trilhas \texttt{<think>} de \texttt{DeepSeek-R1-Distill} e avaliada em \texttt{Qwen2.5-1.5B-Instruct}, onde \verb|\boxed{...}| ocorre próximo ao \texttt{EOS}. Esse deslocamento de entropia e \texttt{logprob} impediu o disparo precoce de \emph{N-Stopping} ($N=4$) e elevou o ECE online ($40{,}52\%$ / $46{,}27\%$). A suíte \texttt{pytest} soma \textbf{35/36 aprovados} (única falha esperada em \texttt{test\_numerical\_consistency\_between\_json\_and\_documents} pelo congelamento intencional de \texttt{main.tex} e \texttt{slides\_projeto2.tex}).
 
 \section{Próximas Etapas: Plano da Fase 4}
 
@@ -152,7 +238,7 @@ CaTS (Huang et al., 2026) & Offline (\texttt{DeepSeek}, $n=200$) & 80,0\% & 2409
 \caption{Roteiro estruturado para conclusão do Projeto 2 (Fase 4).}
 \label{tab:fase4}
 \small
-\begin{tabular}{@{}p{2.2cm}p{4.3cm}p{8.8cm}@{}}
+\begin{tabular}{@{}p{2.0cm}p{4.3cm}p{9.4cm}@{}}
 \toprule
 \textbf{Sub-etapa} & \textbf{Objetivo} & \textbf{Ações Técnicas e Critério de Conclusão} \\
 \midrule
@@ -162,7 +248,7 @@ CaTS (Huang et al., 2026) & Offline (\texttt{DeepSeek}, $n=200$) & 80,0\% & 2409
 \addlinespace
 \textbf{4.3} & Integrar documentos LaTeX finais & Atualizar \texttt{artigo\_ieee/main.tex}, \texttt{apresentacao/slides\_projeto2.tex} e \texttt{relatorio\_ia/relatorio\_ia.tex}, recompilar os PDFs finais e atingir \textbf{36/36 testes aprovados} no \texttt{pytest}. \\
 \addlinespace
-\textbf{4.4} & Empacotamento PPGI0034 & Consolidar os PDFs oficiais em \texttt{01\_Entregas\_PDFs\_Oficiais} no Google Drive e publicar tag de \emph{release} final no repositório GitHub \texttt{lc-sc-reasoning-overthinking}. \\
+\textbf{4.4} & Empacotamento PPGI0034 & Consolidar os PDFs oficiais em \texttt{01\_Entregas\_PDFs\_Oficiais} no Google Drive e publicar tag de \emph{release} final no GitHub \texttt{lc-sc-reasoning-overthinking}. \\
 \bottomrule
 \end{tabular}
 \end{table}
