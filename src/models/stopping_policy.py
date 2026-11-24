@@ -22,17 +22,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import StoppingCriteria
 
-from ..utils.answer_extractor import extract_answer
+from ..utils.answer_extractor import extract_last_boxed
 
 _HESITATION_RE = re.compile(
     r"\b(wait|alternatively|hmm|let's double check|re-evaluate|recalculate|maybe|on second thought|but wait)\b",
     flags=re.IGNORECASE,
 )
 
-_EXPLICIT_ANSWER_CUE_RE = re.compile(
-    r"(\\boxed\{[^{}]+\}|####\s*[-+]?\d|(?:therefore|thus|so),?\s+(?:the\s+)?(?:final\s+)?answer\s+is\s+[-+]?\d)",
+_COMPLETED_NUMERIC_CUE_RE = re.compile(
+    r"(?:####|(?:therefore|thus|so),?\s+(?:the\s+)?(?:final\s+)?answer\s+is)"
+    r"\s*[-+]?\d+(?:,\d{3})*(?:\.\d+)?(?:/\d+)?[ \t]*(?=\n|[.!?]\s)",
     flags=re.IGNORECASE,
 )
+
+
+def has_completed_answer(text: str) -> bool:
+    if r"\boxed" in text or r"\fbox" in text:
+        return extract_last_boxed(text, require_closed=True) is not None
+    return _COMPLETED_NUMERIC_CUE_RE.search(text) is not None
 
 
 class NeuralStoppingPolicy(nn.Module):
@@ -194,6 +201,7 @@ class EntropyNeuralStoppingCriteria(StoppingCriteria):
         self.token_entropies: List[List[float]] = []
         self.token_logprobs: List[List[float]] = []
         self.prev_step_entropy: List[float] = []
+        self.eos_token_id = getattr(tokenizer, "eos_token_id", None)
         self.last_eval_idx: List[int] = []
         self.h_states: List[Optional[torch.Tensor]] = []
         self.last_stop_probs: List[float] = []
@@ -243,6 +251,10 @@ class EntropyNeuralStoppingCriteria(StoppingCriteria):
             self.token_entropies[b].append(float(entropy_t[b].item()))
             self.token_logprobs[b].append(float(chosen_lp[b].item()))
 
+            if self.eos_token_id is not None and int(last_tok_ids[b, 0]) == self.eos_token_id:
+                self.stopped[b] = True
+                continue
+
             # Evaluate policy every `step_stride` tokens once past `l_min`
             if gen_len - self.last_eval_idx[b] >= self.step_stride:
                 start_i = self.last_eval_idx[b]
@@ -258,7 +270,7 @@ class EntropyNeuralStoppingCriteria(StoppingCriteria):
                     decoded_so_far = self.tokenizer.decode(
                         input_ids[b, self.prompt_len :], skip_special_tokens=True
                     )
-                    has_cue = 1.0 if _EXPLICIT_ANSWER_CUE_RE.search(decoded_so_far) else 0.0
+                    has_cue = float(has_completed_answer(decoded_so_far))
                     recent_text = self.tokenizer.decode(
                         input_ids[b, max(self.prompt_len, input_ids.shape[1] - self.step_stride) :],
                         skip_special_tokens=True,

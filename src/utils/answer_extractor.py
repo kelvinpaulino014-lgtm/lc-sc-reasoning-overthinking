@@ -85,47 +85,37 @@ class SegmentedStep:
         }
 
 
-def extract_last_boxed(text: str) -> Optional[str]:
-    """
-    Extrai o conteúdo do último comando `\\boxed{...}` ou `\\fbox{...}` no texto,
-    respeitando chaves aninhadas (ex.: `\\boxed{\\frac{1}{2}}`).
-    """
-    if not text or not isinstance(text, str):
+def extract_last_boxed(text: str, *, require_closed: bool = True) -> Optional[str]:
+    """Read the latest box, including nested braces. A new open box invalidates an older one."""
+    if not isinstance(text, str):
+        return None
+    start = max(text.rfind("\\boxed"), text.rfind("\\fbox"))
+    if start < 0:
         return None
 
-    idx = text.rfind("\\boxed")
-    cmd_len = 6
-    if idx < 0:
-        idx = text.rfind("\\fbox")
-        cmd_len = 5
-        if idx < 0:
+    match = re.match(r"\\(?:boxed|fbox)\s*\{", text[start:])
+    if not match:
+        if require_closed:
             return None
+        unbraced = re.match(r"\\(?:boxed|fbox)\s+([^\s$}]+)", text[start:])
+        return unbraced.group(1).strip() if unbraced else None
 
-    i = idx + cmd_len
-    while i < len(text) and text[i].isspace():
-        i += 1
-
-    if i >= len(text) or text[i] != "{":
-        # Caso \boxed sem chaves explícitas (ex: \boxed 42)
-        match = re.match(r"\\(?:boxed|fbox)\s+([^\s$}]+)", text[idx:])
-        return match.group(1).strip() if match else None
-
-    open_start = i + 1
-    depth = 0
-    while i < len(text):
-        ch = text[i]
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[open_start:i].strip()
-        i += 1
-
-    # Caso a geração tenha sido truncada antes de fechar a última chave,
-    # tenta recuperar o conteúdo após `\boxed{`
-    tail = text[open_start:].strip()
-    return tail if tail else None
+    content_start = start + match.end()
+    depth = 1
+    escaped = False
+    for i in range(content_start, len(text)):
+        char = text[i]
+        if not escaped:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[content_start:i].strip() or None
+        escaped = (char == "\\") and not escaped
+    if require_closed:
+        return None
+    return text[content_start:].strip() or None
 
 
 def _fix_latex_fracs(string: str) -> str:
@@ -199,6 +189,8 @@ def normalize_math_answer(raw_answer: Optional[str]) -> Optional[str]:
     boxed = extract_last_boxed(s)
     if boxed is not None:
         s = boxed
+    elif r"\boxed" in s or r"\fbox" in s:
+        return None
 
     # Remove delimitadores de modo matemático e pontuação final
     s = s.strip()
@@ -211,14 +203,13 @@ def normalize_math_answer(raw_answer: Optional[str]) -> Optional[str]:
     s = s.replace("^{\\circ}", "").replace("^\\circ", "").replace("°", "")
     s = s.replace("\\%", "").replace("%", "")
 
-    # Remove blocos \text{...} ou \mbox{...} que representam unidades
-    s = re.sub(r"\\(?:text|mathrm|textbf|mbox)\s*\{([^{}]*)\}", lambda m: m.group(1) if len(m.group(1).strip()) <= 1 else "", s)
+    # A LaTeX text group can itself be the entire answer, e.g. \text{east}.
+    s = re.sub(r"\\(?:text|mathrm|textbf|mbox)\s*\{([^{}]*)\}", r" \1 ", s).strip()
 
-    # Remove atribuições iniciais simples como "x = 5" ou "ans = 5"
-    if "=" in s:
-        parts = s.split("=")
-        if len(parts) == 2 and len(parts[0].strip()) <= 6:
-            s = parts[1].strip()
+    # Strip a simple assignment only. Equations such as x^2=1 are meaningful.
+    assignment = re.fullmatch(r"(?:[a-zA-Z]|ans)\s*=\s*([^=]+)", s)
+    if assignment:
+        s = assignment.group(1).strip()
 
     # Remove pontuação final solta (ponto final, vírgula ou ponto e vírgula no fim)
     s = s.rstrip(".,;:")
@@ -344,6 +335,9 @@ def extract_answer(text: Optional[str], benchmark: str = "auto") -> Optional[str
         candidate = normalize_math_answer(boxed)
         if candidate is not None:
             return candidate
+    elif r"\boxed" in cleaned_text or r"\fbox" in cleaned_text:
+        # The last explicit answer was interrupted. A preceding arithmetic digit is not a final answer.
+        return None
 
     # Se houver </think>, prioriza o texto após </think> para cues e números finais
     post_think_text = cleaned_text

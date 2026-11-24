@@ -1,0 +1,14 @@
+{
+  "seed": 24112026,
+  "sha256": {
+    "inputs.jsonl": "988c352fb39c51fddf0f520069fd92fc95eaa4fe0a78b5a87b9ac774fb32e184",
+    "labels.jsonl": "3ddc269cf003c0e5a8f5588d7fdf95950e9cdc2ad4af5782a5f068dfebe69653"
+  },
+  "gsm_snapshot": "740312add88f781978c0658806c59bc2815b9866",
+  "math_snapshot": "6e4ed1a2a79af7d8630a6b768ec859cb5af4d3be",
+  "per_dataset": {
+    "train": 80,
+    "calibration": 32,
+    "holdout": 96
+  }
+}

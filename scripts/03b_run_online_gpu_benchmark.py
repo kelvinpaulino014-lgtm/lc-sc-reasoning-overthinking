@@ -39,8 +39,8 @@ from src.utils.answer_extractor import extract_answer, is_equivalent
 
 DATA_DIR = PROJECT_ROOT / "data"
 RESULTS_DIR = PROJECT_ROOT / "results"
-OUT_DIR = RESULTS_DIR / "phase3_deep_training"
-CKPT_DIR = OUT_DIR / "checkpoints"
+CKPT_DIR = RESULTS_DIR / "phase3_deep_training" / "checkpoints"
+OUT_DIR = RESULTS_DIR / "corrected_legacy_online"
 
 
 def log_msg(log_path: Path, msg: str) -> None:
@@ -75,11 +75,30 @@ def build_prompt(tokenizer: Any, question: str) -> str:
     messages = [
         {
             "role": "system",
-            "content": "You are a precise math assistant. Solve the problem step by step and put your final numeric answer inside \\boxed{}.",
+            "content": "You are a precise math assistant. Solve the problem step by step and put your final answer inside \\boxed{}.",
         },
         {"role": "user", "content": question.strip()},
     ]
     return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+
+def generated_length(token_ids: List[int], eos_id: Optional[int], stop_at: Optional[int]) -> int:
+    """Count all consumed tokens through the first EOS or the policy stop, inclusive."""
+    end = len(token_ids) if stop_at is None else stop_at
+    if not 0 <= end <= len(token_ids):
+        raise ValueError("The stop position must lie inside the generated sequence.")
+    for idx, token_id in enumerate(token_ids[:end], 1):
+        if token_id == eos_id:
+            return idx
+    return end
+
+
+def leading_vote(weights: Dict[str, float], valid: int, attempted: int) -> Tuple[Optional[str], float]:
+    """Invalid answers abstain and reduce support in proportion to their frequency."""
+    if not weights:
+        return None, 0.0
+    answer = max(weights, key=weights.get)
+    return answer, (weights[answer] / sum(weights.values())) * (valid / attempted)
 
 
 @torch.no_grad()
@@ -103,7 +122,7 @@ def generate_batch_traces(
         "max_new_tokens": max_new_tokens,
         "do_sample": do_sample,
         "num_return_sequences": num_samples,
-        "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
+        "pad_token_id": tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id,
         "eos_token_id": tokenizer.eos_token_id,
         "output_scores": True,
         "return_dict_in_generate": True,
@@ -131,13 +150,11 @@ def generate_batch_traces(
     n_steps = len(scores)
     for b in range(seqs.shape[0]):
         gen_ids = seqs[b, prompt_len:]
-        # Count exact non-pad/non-post-EOS tokens
-        valid_len = 0
-        for tid in gen_ids.tolist():
-            valid_len += 1
-            if eos_id is not None and tid == eos_id:
-                break
-        valid_len = max(1, min(valid_len, n_steps))
+        stop_positions = [
+            crit.stop_tokens[b] for crit in stopping_criteria or []
+            if isinstance(crit, EntropyNeuralStoppingCriteria) and crit.stop_tokens[b] is not None
+        ]
+        valid_len = generated_length(gen_ids[:n_steps].tolist(), eos_id, min(stop_positions, default=None))
         tok_counts.append(valid_len)
         texts.append(tokenizer.decode(gen_ids[:valid_len], skip_special_tokens=True))
 
@@ -204,7 +221,7 @@ def evaluate_dataset_gpu(
         methods_data["Greedy CoT (N=1)"]["tokens"].append(toks_g[0])
         methods_data["Greedy CoT (N=1)"]["samples"].append(1)
         methods_data["Greedy CoT (N=1)"]["latency"].append(lat_g)
-        methods_data["Greedy CoT (N=1)"]["conf"].append(confs_g[0])
+        methods_data["Greedy CoT (N=1)"]["conf"].append(confs_g[0] if ans_g else 0.0)
 
         # 2. Standard SC (N=8) -> two batches of 4 for RTX 3050 6GB VRAM safety
         sc_texts, sc_toks, sc_confs = [], [], []
@@ -219,10 +236,11 @@ def evaluate_dataset_gpu(
             sc_lat += l_b
         votes_sc: Dict[str, int] = defaultdict(int)
         for txt in sc_texts:
-            a = extract_answer(txt, benchmark=ds_key) or "__NONE__"
-            votes_sc[a] += 1
-        pred_sc = max(votes_sc, key=votes_sc.get)
-        conf_sc = float(np.clip(0.35 * (votes_sc[pred_sc] / 8.0) + 0.65 * float(np.mean(sc_confs)), 0.15, 0.99))
+            answer = extract_answer(txt, benchmark=ds_key)
+            if answer is not None:
+                votes_sc[answer] += 1
+        pred_sc, vote_share = leading_vote(votes_sc, sum(votes_sc.values()), 8)
+        conf_sc = 0.35 * vote_share + 0.65 * float(np.mean(sc_confs)) if pred_sc else 0.0
         methods_data["Standard SC (N=8)"]["correct"].append(int(is_equivalent(pred_sc, gold)))
         methods_data["Standard SC (N=8)"]["tokens"].append(int(sum(sc_toks)))
         methods_data["Standard SC (N=8)"]["samples"].append(8)
@@ -230,29 +248,24 @@ def evaluate_dataset_gpu(
         methods_data["Standard SC (N=8)"]["conf"].append(conf_sc)
 
         # 3. CaTS (Huang et al., 2026) -> adaptive N in {4, 8} without L-Stopping
-        t_c1, k_c1, c_c1, l_c1 = generate_batch_traces(
-            model, tokenizer, p_ids, p_mask, num_samples=4, max_new_tokens=max_new_tokens, do_sample=True
-        )
-        cal_c1 = iso_cats.predict(np.array(c_c1))
         w_cats: Dict[str, float] = defaultdict(float)
-        for txt, cc in zip(t_c1, cal_c1):
-            w_cats[extract_answer(txt, benchmark=ds_key) or "__NONE__"] += float(cc)
-        tot_wc = max(1e-6, sum(w_cats.values()))
-        top_cats = max(w_cats, key=w_cats.get)
-        cats_toks, cats_n, cats_lat = int(sum(k_c1)), 4, l_c1
-        if (w_cats[top_cats] / tot_wc) < 0.72:
-            t_c2, k_c2, c_c2, l_c2 = generate_batch_traces(
+        valid_cats = cats_toks = cats_n = 0
+        cats_lat = 0.0
+        for _ in range(2):
+            texts_c, tokens_c, raw_c, elapsed_c = generate_batch_traces(
                 model, tokenizer, p_ids, p_mask, num_samples=4, max_new_tokens=max_new_tokens, do_sample=True
             )
-            cal_c2 = iso_cats.predict(np.array(c_c2))
-            for txt, cc in zip(t_c2, cal_c2):
-                w_cats[extract_answer(txt, benchmark=ds_key) or "__NONE__"] += float(cc)
-            cats_toks += int(sum(k_c2))
-            cats_n = 8
-            cats_lat += l_c2
-            tot_wc = max(1e-6, sum(w_cats.values()))
-            top_cats = max(w_cats, key=w_cats.get)
-        conf_cats = float(np.clip(w_cats[top_cats] / tot_wc, 0.15, 0.96))
+            cats_toks += sum(tokens_c)
+            cats_n += len(texts_c)
+            cats_lat += elapsed_c
+            for txt, weight in zip(texts_c, iso_cats.predict(raw_c)):
+                answer = extract_answer(txt, benchmark=ds_key)
+                if answer is not None:
+                    w_cats[answer] += float(weight)
+                    valid_cats += 1
+            top_cats, conf_cats = leading_vote(w_cats, valid_cats, cats_n)
+            if conf_cats >= 0.72:
+                break
         methods_data["CaTS (Huang et al., 2026)"]["correct"].append(int(is_equivalent(top_cats, gold)))
         methods_data["CaTS (Huang et al., 2026)"]["tokens"].append(cats_toks)
         methods_data["CaTS (Huang et al., 2026)"]["samples"].append(cats_n)
@@ -263,6 +276,7 @@ def evaluate_dataset_gpu(
         w_lcsc: Dict[str, float] = defaultdict(float)
         c_lcsc_by_ans: Dict[str, List[float]] = defaultdict(list)
         lcsc_toks, lcsc_n, lcsc_lat = 0, 0, 0.0
+        valid_lcsc = 0
         for batch_n in (4, 4):
             criteria = EntropyNeuralStoppingCriteria(
                 policy=policy,
@@ -295,26 +309,17 @@ def evaluate_dataset_gpu(
                 c_eff = 0.65 * corr_p + 0.35 * raw_c
                 dev = max(0.0, float(tok_cnt) - l_star)
                 w_i = c_eff * math.exp(-0.85 * dev / max(35.0, 0.35 * l_star))
+                valid_lcsc += 1
                 w_lcsc[ans_i] += w_i
                 c_lcsc_by_ans[ans_i].append(c_eff)
 
-            if w_lcsc:
-                tot_wl = max(1e-6, sum(w_lcsc.values()))
-                top_lcsc = max(w_lcsc, key=w_lcsc.get)
-                lead_ratio = w_lcsc[top_lcsc] / tot_wl
+            top_lcsc, lead_ratio = leading_vote(w_lcsc, valid_lcsc, lcsc_n)
+            if top_lcsc is not None:
                 top_c_mean = float(np.mean(c_lcsc_by_ans[top_lcsc]))
-                if lcsc_n >= 4 and lead_ratio >= 0.72 and top_c_mean >= 0.55:
+                if lead_ratio >= 0.72 and top_c_mean >= 0.55:
                     break
 
-        if w_lcsc:
-            tot_wl = max(1e-6, sum(w_lcsc.values()))
-            top_lcsc = max(w_lcsc, key=w_lcsc.get)
-            lead_ratio = w_lcsc[top_lcsc] / tot_wl
-            top_c_mean = float(np.mean(c_lcsc_by_ans[top_lcsc]))
-            conf_lcsc = float(np.clip(0.55 * lead_ratio + 0.45 * top_c_mean, 0.10, 0.98))
-        else:
-            top_lcsc = "__NONE__"
-            conf_lcsc = 0.15
+        conf_lcsc = 0.55 * lead_ratio + 0.45 * top_c_mean if top_lcsc is not None else 0.0
         methods_data["LC-SC Phase 3 (Neural GPU)"]["correct"].append(int(is_equivalent(top_lcsc, gold)))
         methods_data["LC-SC Phase 3 (Neural GPU)"]["tokens"].append(lcsc_toks)
         methods_data["LC-SC Phase 3 (Neural GPU)"]["samples"].append(lcsc_n)
@@ -331,7 +336,13 @@ def evaluate_dataset_gpu(
 
     peak_vram_mb = torch.cuda.max_memory_allocated() / (1024.0**2) if torch.cuda.is_available() else 0.0
 
-    summary_out: Dict[str, Any] = {"peak_vram_mb": round(peak_vram_mb, 1), "n_questions": len(df_test_batch), "methods": {}}
+    summary_out: Dict[str, Any] = {
+        "peak_vram_mb": round(peak_vram_mb, 1),
+        "n_questions": len(df_test_batch),
+        "calibration_origin": "synthetic_gold_conditioned_legacy_traces",
+        "question_ids": df_test_batch["question_id"].tolist(),
+        "methods": {},
+    }
     sc_avg_tok = float(np.mean(methods_data["Standard SC (N=8)"]["tokens"]))
     sc_avg_lat = float(np.mean(methods_data["Standard SC (N=8)"]["latency"]))
 
@@ -340,13 +351,10 @@ def evaluate_dataset_gpu(
         tok_m, _, _ = bootstrap_ci(d["tokens"], n_boot=1000, seed=42)
         lat_m = float(np.mean(d["latency"]))
         y_true = np.asarray(d["correct"], dtype=float)
-        y_prob = np.clip(np.asarray(d["conf"], dtype=float), 0.01, 0.99)
-        ece_val = compute_ece(y_true, y_prob, n_bins=8)
+        y_prob = np.asarray(d["conf"], dtype=float)
+        ece_val = compute_ece(confidences=y_prob, accuracies=y_true, n_bins=8)
         brier_val = float(brier_score_loss(y_true, y_prob))
-        try:
-            auc_val = float(roc_auc_score(y_true, y_prob)) * 100.0 if len(np.unique(y_true)) > 1 else 50.0
-        except Exception:
-            auc_val = 50.0
+        auc_pct = round(float(roc_auc_score(y_true, y_prob)) * 100.0, 2) if len(np.unique(y_true)) > 1 else None
 
         summary_out["methods"][m_name] = {
             "accuracy_pct": round(acc_m * 100.0, 2),
@@ -358,10 +366,10 @@ def evaluate_dataset_gpu(
             "avg_latency_sec": round(lat_m, 2),
             "speedup_vs_sc": round(sc_avg_lat / max(0.01, lat_m), 2),
             "throughput_tok_per_sec": round(tok_m / max(0.01, lat_m), 1),
-            "peak_vram_mb": round(peak_vram_mb, 1),
+            "per_question": d,
             "ece_pct": round(ece_val * 100.0, 2),
             "brier_score": round(brier_val, 4),
-            "roc_auc_pct": round(auc_val, 2),
+            "roc_auc_pct": auc_pct,
         }
     return summary_out
 
@@ -443,7 +451,8 @@ def main() -> None:
     rows = []
     for ds_label, ds_obj in [("GSM8K", gsm_res), ("MATH-500", math_res)]:
         for m_name, m_st in ds_obj["methods"].items():
-            rows.append({"Dataset": ds_label, "Method": m_name, **m_st})
+            summary = {k: v for k, v in m_st.items() if k != "per_question"}
+            rows.append({"Dataset": ds_label, "Method": m_name, **summary})
     df_sum = pd.DataFrame(rows)
     df_sum.to_csv(OUT_DIR / "online_gpu_benchmark_summary.csv", index=False)
     plot_gpu_latency_pareto(full_out)

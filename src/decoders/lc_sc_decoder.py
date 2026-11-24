@@ -159,7 +159,6 @@ class LCSCDecoder(BaseCoTDecoder):
         clean_confidences: List[float] = []
         clean_entropies: List[float] = []
         prev_cum_tokens = 0
-        num_steps = len(trace.steps)
 
         for idx, step in enumerate(trace.steps):
             step_tokens = max(1, step.cumulative_tokens - prev_cum_tokens)
@@ -183,32 +182,13 @@ class LCSCDecoder(BaseCoTDecoder):
             )
 
             if spike_triggered or overthinking_spike:
-                # Se o pico ocorreu no último passo da lista, contabiliza apenas os tokens
-                # até o início do pico (garantindo L_used < L_full quando o passo final é longo)
-                if idx < num_steps - 1 and step.cumulative_tokens < trace.total_tokens:
-                    used_tok = step.cumulative_tokens
-                else:
-                    buffer_tok = max(1, min(16, step_tokens // 3))
-                    used_tok = min(trace.total_tokens - 1, prev_cum_tokens + buffer_tok)
-                    used_tok = max(1, used_tok)
-
-                eff_conf = (
-                    float(np.mean(clean_confidences))
-                    if clean_confidences
-                    else float(max(trace.raw_confidence, step.step_confidence))
-                )
-                eff_ent = (
-                    float(np.mean(clean_entropies))
-                    if clean_entropies
-                    else float(min(trace.mean_entropy, step.step_entropy))
-                )
-
+                # The trigger uses the entropy of this complete step, including its final token.
                 return TruncatedTraceResult(
                     extracted_answer=last_valid_answer,
-                    used_tokens=int(used_tok),
+                    used_tokens=int(step.cumulative_tokens),
                     full_tokens=trace.total_tokens,
-                    effective_raw_confidence=eff_conf,
-                    effective_mean_entropy=eff_ent,
+                    effective_raw_confidence=float(np.mean(clean_confidences)),
+                    effective_mean_entropy=float(np.mean(clean_entropies)),
                     was_l_stopped=True,
                     stopped_step_idx=idx,
                 )

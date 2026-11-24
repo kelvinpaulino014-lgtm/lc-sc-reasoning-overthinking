@@ -1,0 +1,659 @@
+{
+  "deployment_seed": 101,
+  "datasets": {
+    "gsm8k": {
+      "sc4": {
+        "n_questions": 96,
+        "accuracy_pct": 73.96,
+        "ci95_low_pct": 64.58,
+        "ci95_high_pct": 82.29,
+        "avg_tokens": 1172.4,
+        "tokens_ci95": [
+          1122.2,
+          1222.4
+        ],
+        "avg_traces": 4.0,
+        "ece_pct": 29.25,
+        "brier_score": 0.1578,
+        "roc_auc_pct": 81.44,
+        "l_stopped_traces": 0,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 5,
+        "token_saving_vs_sc4_pct": 0.0,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      },
+      "consensus2": {
+        "n_questions": 96,
+        "accuracy_pct": 73.96,
+        "ci95_low_pct": 64.58,
+        "ci95_high_pct": 82.29,
+        "avg_tokens": 927.5,
+        "tokens_ci95": [
+          841.8,
+          1011.4
+        ],
+        "avg_traces": 3.06,
+        "ece_pct": 27.26,
+        "brier_score": 0.1639,
+        "roc_auc_pct": 79.04,
+        "l_stopped_traces": 0,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 5,
+        "token_saving_vs_sc4_pct": 20.9,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      },
+      "first_box": {
+        "n_questions": 96,
+        "accuracy_pct": 73.96,
+        "ci95_low_pct": 64.58,
+        "ci95_high_pct": 82.29,
+        "avg_tokens": 926.0,
+        "tokens_ci95": [
+          840.2,
+          1010.2
+        ],
+        "avg_traces": 3.06,
+        "ece_pct": 27.26,
+        "brier_score": 0.1639,
+        "roc_auc_pct": 79.04,
+        "l_stopped_traces": 211,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 5,
+        "token_saving_vs_sc4_pct": 21.0,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      },
+      "fixed_cap": {
+        "n_questions": 96,
+        "accuracy_pct": 15.62,
+        "ci95_low_pct": 9.38,
+        "ci95_high_pct": 22.94,
+        "avg_tokens": 735.9,
+        "tokens_ci95": [
+          713.7,
+          754.7
+        ],
+        "avg_traces": 3.88,
+        "ece_pct": 9.96,
+        "brier_score": 0.0643,
+        "roc_auc_pct": 97.98,
+        "l_stopped_traces": 372,
+        "correct_candidate_lost": 188,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 77,
+        "token_saving_vs_sc4_pct": 37.2,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": -58.3333,
+          "ci_low": -67.7083,
+          "ci_high": -48.9323,
+          "n_losses": 56,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 67.69
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": -58.3333,
+          "ci_low": -67.7083,
+          "ci_high": -48.9323,
+          "n_losses": 56,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 67.69
+        }
+      },
+      "logistic": {
+        "n_questions": 96,
+        "accuracy_pct": 73.96,
+        "ci95_low_pct": 64.58,
+        "ci95_high_pct": 82.29,
+        "avg_tokens": 926.0,
+        "tokens_ci95": [
+          840.2,
+          1010.2
+        ],
+        "avg_traces": 3.06,
+        "ece_pct": 27.26,
+        "brier_score": 0.1639,
+        "roc_auc_pct": 79.04,
+        "l_stopped_traces": 199,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 5,
+        "token_saving_vs_sc4_pct": 21.0,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      },
+      "gru": {
+        "n_questions": 96,
+        "accuracy_pct": 73.96,
+        "ci95_low_pct": 64.58,
+        "ci95_high_pct": 82.29,
+        "avg_tokens": 926.1,
+        "tokens_ci95": [
+          840.4,
+          1010.2
+        ],
+        "avg_traces": 3.06,
+        "ece_pct": 27.26,
+        "brier_score": 0.1639,
+        "roc_auc_pct": 79.04,
+        "l_stopped_traces": 195,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 5,
+        "token_saving_vs_sc4_pct": 21.0,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      }
+    },
+    "math500": {
+      "sc4": {
+        "n_questions": 96,
+        "accuracy_pct": 41.67,
+        "ci95_low_pct": 32.29,
+        "ci95_high_pct": 51.04,
+        "avg_tokens": 1416.1,
+        "tokens_ci95": [
+          1377.4,
+          1451.9
+        ],
+        "avg_traces": 4.0,
+        "ece_pct": 17.29,
+        "brier_score": 0.0912,
+        "roc_auc_pct": 98.28,
+        "l_stopped_traces": 0,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 50,
+        "token_saving_vs_sc4_pct": 0.0,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      },
+      "consensus2": {
+        "n_questions": 96,
+        "accuracy_pct": 41.67,
+        "ci95_low_pct": 32.29,
+        "ci95_high_pct": 51.04,
+        "avg_tokens": 1290.9,
+        "tokens_ci95": [
+          1210.4,
+          1367.4
+        ],
+        "avg_traces": 3.58,
+        "ece_pct": 14.53,
+        "brier_score": 0.0828,
+        "roc_auc_pct": 98.3,
+        "l_stopped_traces": 0,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 50,
+        "token_saving_vs_sc4_pct": 8.8,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      },
+      "first_box": {
+        "n_questions": 96,
+        "accuracy_pct": 41.67,
+        "ci95_low_pct": 32.29,
+        "ci95_high_pct": 51.04,
+        "avg_tokens": 1290.5,
+        "tokens_ci95": [
+          1210.2,
+          1367.0
+        ],
+        "avg_traces": 3.58,
+        "ece_pct": 14.53,
+        "brier_score": 0.0828,
+        "roc_auc_pct": 98.3,
+        "l_stopped_traces": 88,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 50,
+        "token_saving_vs_sc4_pct": 8.9,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      },
+      "fixed_cap": {
+        "n_questions": 96,
+        "accuracy_pct": 2.08,
+        "ci95_low_pct": 0.0,
+        "ci95_high_pct": 5.21,
+        "avg_tokens": 763.3,
+        "tokens_ci95": [
+          754.0,
+          768.0
+        ],
+        "avg_traces": 3.98,
+        "ece_pct": 1.77,
+        "brier_score": 0.006,
+        "roc_auc_pct": 100.0,
+        "l_stopped_traces": 382,
+        "correct_candidate_lost": 99,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 94,
+        "token_saving_vs_sc4_pct": 46.1,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": -39.5833,
+          "ci_low": -48.9583,
+          "ci_high": -30.2083,
+          "n_losses": 38,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 49.59
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": -39.5833,
+          "ci_low": -48.9583,
+          "ci_high": -30.2083,
+          "n_losses": 38,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 49.59
+        }
+      },
+      "logistic": {
+        "n_questions": 96,
+        "accuracy_pct": 41.67,
+        "ci95_low_pct": 32.29,
+        "ci95_high_pct": 51.04,
+        "avg_tokens": 1290.5,
+        "tokens_ci95": [
+          1210.2,
+          1367.0
+        ],
+        "avg_traces": 3.58,
+        "ece_pct": 14.53,
+        "brier_score": 0.0828,
+        "roc_auc_pct": 98.3,
+        "l_stopped_traces": 77,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 50,
+        "token_saving_vs_sc4_pct": 8.9,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      },
+      "gru": {
+        "n_questions": 96,
+        "accuracy_pct": 41.67,
+        "ci95_low_pct": 32.29,
+        "ci95_high_pct": 51.04,
+        "avg_tokens": 1290.5,
+        "tokens_ci95": [
+          1210.2,
+          1367.0
+        ],
+        "avg_traces": 3.58,
+        "ece_pct": 14.53,
+        "brier_score": 0.0828,
+        "roc_auc_pct": 98.3,
+        "l_stopped_traces": 74,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 50,
+        "token_saving_vs_sc4_pct": 8.9,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 3.85
+        }
+      }
+    },
+    "overall": {
+      "sc4": {
+        "n_questions": 192,
+        "accuracy_pct": 57.81,
+        "ci95_low_pct": 50.52,
+        "ci95_high_pct": 64.6,
+        "avg_tokens": 1294.3,
+        "tokens_ci95": [
+          1256.0,
+          1329.4
+        ],
+        "avg_traces": 4.0,
+        "ece_pct": 23.27,
+        "brier_score": 0.1245,
+        "roc_auc_pct": 92.65,
+        "l_stopped_traces": 0,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 55,
+        "token_saving_vs_sc4_pct": 0.0,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        }
+      },
+      "consensus2": {
+        "n_questions": 192,
+        "accuracy_pct": 57.81,
+        "ci95_low_pct": 50.52,
+        "ci95_high_pct": 64.6,
+        "avg_tokens": 1109.2,
+        "tokens_ci95": [
+          1040.9,
+          1173.5
+        ],
+        "avg_traces": 3.32,
+        "ece_pct": 20.9,
+        "brier_score": 0.1233,
+        "roc_auc_pct": 92.08,
+        "l_stopped_traces": 0,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 55,
+        "token_saving_vs_sc4_pct": 14.3,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        }
+      },
+      "first_box": {
+        "n_questions": 192,
+        "accuracy_pct": 57.81,
+        "ci95_low_pct": 50.52,
+        "ci95_high_pct": 64.6,
+        "avg_tokens": 1108.2,
+        "tokens_ci95": [
+          1040.1,
+          1172.6
+        ],
+        "avg_traces": 3.32,
+        "ece_pct": 20.9,
+        "brier_score": 0.1233,
+        "roc_auc_pct": 92.08,
+        "l_stopped_traces": 299,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 55,
+        "token_saving_vs_sc4_pct": 14.4,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        }
+      },
+      "fixed_cap": {
+        "n_questions": 192,
+        "accuracy_pct": 8.85,
+        "ci95_low_pct": 5.21,
+        "ci95_high_pct": 13.02,
+        "avg_tokens": 749.6,
+        "tokens_ci95": [
+          736.9,
+          760.3
+        ],
+        "avg_traces": 3.93,
+        "ece_pct": 5.86,
+        "brier_score": 0.0351,
+        "roc_auc_pct": 99.08,
+        "l_stopped_traces": 754,
+        "correct_candidate_lost": 287,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 171,
+        "token_saving_vs_sc4_pct": 42.1,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": -48.9583,
+          "ci_low": -55.7292,
+          "ci_high": -41.6667,
+          "n_losses": 94,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 55.98
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": -48.9583,
+          "ci_low": -55.7292,
+          "ci_high": -41.6667,
+          "n_losses": 94,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 55.98
+        }
+      },
+      "logistic": {
+        "n_questions": 192,
+        "accuracy_pct": 57.81,
+        "ci95_low_pct": 50.52,
+        "ci95_high_pct": 64.6,
+        "avg_tokens": 1108.3,
+        "tokens_ci95": [
+          1040.1,
+          1172.6
+        ],
+        "avg_traces": 3.32,
+        "ece_pct": 20.9,
+        "brier_score": 0.1233,
+        "roc_auc_pct": 92.08,
+        "l_stopped_traces": 276,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 55,
+        "token_saving_vs_sc4_pct": 14.4,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        }
+      },
+      "gru": {
+        "n_questions": 192,
+        "accuracy_pct": 57.81,
+        "ci95_low_pct": 50.52,
+        "ci95_high_pct": 64.6,
+        "avg_tokens": 1108.3,
+        "tokens_ci95": [
+          1040.1,
+          1172.7
+        ],
+        "avg_traces": 3.32,
+        "ece_pct": 20.9,
+        "brier_score": 0.1233,
+        "roc_auc_pct": 92.08,
+        "l_stopped_traces": 269,
+        "correct_candidate_lost": 0,
+        "incorrect_candidate_improved": 0,
+        "no_explicit_answer": 55,
+        "token_saving_vs_sc4_pct": 14.4,
+        "paired_acc_diff_vs_sc4_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        },
+        "paired_acc_diff_vs_consensus2_pp": {
+          "mean": 0.0,
+          "ci_low": 0.0,
+          "ci_high": 0.0,
+          "n_losses": 0,
+          "n_gains": 0,
+          "conservative_loss_upper_pct": 1.96
+        }
+      }
+    }
+  }
+}

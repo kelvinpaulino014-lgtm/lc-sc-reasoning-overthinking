@@ -1,0 +1,35 @@
+{
+  "protocol": {
+    "schema": "phase4-real-v1",
+    "model": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "dtype": "float16",
+    "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+    "inputs_sha256": "988c352fb39c51fddf0f520069fd92fc95eaa4fe0a78b5a87b9ac774fb32e184",
+    "n_inputs": 416,
+    "generation": {
+      "num_return_sequences": 4,
+      "max_new_tokens": 384,
+      "do_sample": true,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "top_k": 20,
+      "repetition_penalty": 1.1
+    },
+    "eos_token_id": 151645,
+    "pad_token_id": 151643,
+    "prompt": "You are a precise math assistant. Solve the problem step by step and put your final answer inside \\boxed{}.",
+    "chat_template_sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f",
+    "score_definition": "Entropy (nats) and sampled log probability after warpers and logits processors",
+    "seed_definition": "uint32 big-endian of SHA256('phase4-real-v1|dataset|question_id')[:4]",
+    "torch": "2.5.1+cu121",
+    "cuda": "12.1",
+    "transformers": "4.48.3",
+    "python": "3.10.11"
+  },
+  "created_utc": "2026-11-24T05:43:25.774409+00:00",
+  "platform": "Windows-10-10.0.22631-SP0",
+  "script_sha256": "dd616fab09ca6730e2efececcfbee69657d2d8f56555b60acf9ac2b62d2807b8",
+  "deadline": "2026-11-24T08:40:00-03:00",
+  "git_head": "f069efb94b462641569678038aa6d74e4ba4f7f2"
+}

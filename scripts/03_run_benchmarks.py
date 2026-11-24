@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script 03: Avaliação Rigorosa dos 5 Métodos de Decodificação + Estudo de Ablação +
-Análise por Fatias de Dificuldade (Slice Analysis) + Intervalos de Confiança Bootstrap 95%.
-Segue estritamente as diretrizes de ML Best Practices:
-- Ajuste (fit) de L*, sigma_L, tau_H e calibração isotônica EXCLUSIVAMENTE no split `val_calibration`;
-- Avaliação final reportada EXCLUSIVAMENTE no split `test` (zero data leakage);
-- Cálculo de IC 95% via Bootstrap (B=1000), ECE (Expected Calibration Error), Brier Score e ROC-AUC.
+Fases 1–2. Replay de simulação condicionada ao gabarito sobre trilhas derivadas de
+âncoras. As métricas descrevem o simulador e seus decodificadores. A Fase 4 avalia
+gerações do modelo salvas independentemente dos rótulos.
 """
 
 import json
 import math
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -24,7 +22,11 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+from src.metrics.entropy_tracker import compute_calibration_bins
+
 RESULTS_DIR = PROJECT_ROOT / "results"
+OUT_DIR = RESULTS_DIR / "corrected_legacy_replay"
 
 
 def calculate_ece_and_bins(
@@ -33,29 +35,17 @@ def calculate_ece_and_bins(
     n_bins: int = 8,
 ) -> Tuple[float, List[Dict[str, float]]]:
     """Calcula o Expected Calibration Error (ECE) e os pontos do diagrama de confiabilidade."""
-    y_true = np.asarray(y_true, dtype=float)
-    y_prob = np.clip(np.asarray(y_prob, dtype=float), 0.001, 0.999)
-    bins = np.linspace(0.25, 1.0, n_bins + 1)
-    bin_indices = np.digitize(y_prob, bins) - 1
-
-    ece = 0.0
-    bin_records: List[Dict[str, float]] = []
-    n_total = max(1, len(y_true))
-
-    for b in range(n_bins):
-        mask = bin_indices == b
-        if np.any(mask):
-            mean_conf = float(np.mean(y_prob[mask]))
-            mean_acc = float(np.mean(y_true[mask]))
-            prop = float(np.sum(mask)) / n_total
-            ece += abs(mean_acc - mean_conf) * prop
-            bin_records.append({
-                "bin_idx": int(b),
-                "mean_conf": round(mean_conf, 4),
-                "mean_acc": round(mean_acc, 4),
-                "count": int(np.sum(mask)),
-            })
-    return float(ece), bin_records
+    bins = compute_calibration_bins(confidences=y_prob, accuracies=y_true, n_bins=n_bins)
+    n = sum(b.count for b in bins)
+    if n != len(y_true) or n != len(y_prob):
+        raise ValueError("Cada pergunta deve ter um escore e um desfecho finitos.")
+    ece = sum(b.count * b.calibration_gap for b in bins) / n if n else 0.0
+    records = [
+        {"bin_idx": b.bin_idx, "mean_conf": round(b.mean_confidence, 4),
+         "mean_acc": round(b.mean_accuracy, 4), "count": b.count}
+        for b in bins if b.count
+    ]
+    return float(ece), records
 
 
 def bootstrap_ci(
@@ -187,11 +177,9 @@ def apply_online_l_stopping(
             and last_valid_ans is not None
             and (avg_h > tau_h or step_h > tau_h * 1.15 or (is_over and step_h >= 0.85 * tau_h))
         ):
-            ans_trunc = str(row["midway_answer"]) if row.get("midway_answer") else last_valid_ans
-            used_tokens = int(min(row["total_tokens"], max(l_min, cum_tok)))
             conf_at_stop = float(np.mean(clean_confs)) if clean_confs else step_c
             ent_at_stop = float(np.mean(clean_ents)) if clean_ents else step_h
-            return ans_trunc, used_tokens, conf_at_stop, ent_at_stop, True
+            return last_valid_ans, cum_tok, conf_at_stop, ent_at_stop, True
 
         if st.get("intermediate_answer"):
             last_valid_ans = str(st["intermediate_answer"])
@@ -256,10 +244,9 @@ def evaluate_method_on_questions(
                 toks += int(row["total_tokens"])
             pred = max(votes, key=votes.get)
             used_n = len(df_sub)
-            # Confiança bruta não calibrada (superconfiante em votos de overthinking)
             vote_share = float(votes[pred] / max(1, used_n))
             mean_raw = float(np.mean(confs_by_ans[pred]))
-            conf = float(np.clip(0.35 * vote_share + 0.65 * mean_raw + 0.08, 0.15, 0.99))
+            conf = float(np.clip(0.35 * vote_share + 0.65 * mean_raw, 0.15, 0.99))
 
         elif method_type == "wu_lfv":
             # Wu et al. (ICLR 2026) Length-Filtered Vote:
@@ -308,18 +295,13 @@ def evaluate_method_on_questions(
             pred = max(weighted_votes, key=weighted_votes.get)
             consensus_ratio = float(weighted_votes[pred] / max(1e-6, sum(weighted_votes.values())))
             mean_c_pred = float(np.mean(confs_by_ans[pred])) if confs_by_ans[pred] else 0.5
-            conf = float(np.clip(0.52 * consensus_ratio + 0.48 * mean_c_pred + 0.14, 0.15, 0.96))
+            conf = float(np.clip(0.52 * consensus_ratio + 0.48 * mean_c_pred, 0.15, 0.96))
 
         elif method_type in ("lc_sc", "lc_sc_no_lstop", "lc_sc_no_nstop", "lc_sc_no_len_penalty"):
             # Nosso método proposto LC-SC e suas 3 ablações
             use_l_stop = method_type != "lc_sc_no_lstop"
             use_n_stop = method_type != "lc_sc_no_nstop"
-            if method_type == "lc_sc_no_len_penalty":
-                eff_lambda = 0.0
-            elif method_type == "lc_sc_no_lstop":
-                eff_lambda = 0.22
-            else:
-                eff_lambda = lambda_len
+            eff_lambda = 0.0 if method_type == "lc_sc_no_len_penalty" else lambda_len
 
             weighted_votes: Dict[str, float] = defaultdict(float)
             c_hats_by_ans: Dict[str, List[float]] = defaultdict(list)
@@ -350,40 +332,28 @@ def evaluate_method_on_questions(
                 toks += used_tok_i
                 ents_q.append(ent_i)
 
-                if method_type == "lc_sc_no_len_penalty":
-                    # Sem penalização de comprimento/entropia (lambda=0): usa confiança bruta sem amortecimento L
-                    w_i = conf_raw_i
-                    c_hats_by_ans[ans_i].append(conf_raw_i)
-                elif method_type == "lc_sc_no_lstop":
-                    # Sem L-Stopping online: não possui corte por entropia intratrilha, usando apenas peso suave de comprimento
-                    c_hat_i = float(iso_cats.predict([conf_raw_i])[0])
-                    dev_tokens = max(0.0, used_tok_i - l_star)
-                    len_decay = math.exp(-eff_lambda * dev_tokens / sigma_l)
-                    w_i = c_hat_i * len_decay
-                    c_hats_by_ans[ans_i].append(c_hat_i * (0.75 + 0.25 * len_decay))
+                if "trace_clf_lcsc" in calib:
+                    feat_i = np.array([[
+                        conf_raw_i,
+                        ent_i,
+                        float(was_trunc),
+                        used_tok_i / max(1.0, l_star),
+                        max(0.0, used_tok_i - l_star) / max(1.0, sigma_l),
+                    ]])
+                    c_hat_i = float(calib["trace_clf_lcsc"].predict_proba(feat_i)[0, 1])
                 else:
-                    if "trace_clf_lcsc" in calib:
-                        feat_i = np.array([[
-                            conf_raw_i,
-                            ent_i,
-                            float(was_trunc),
-                            used_tok_i / max(1.0, l_star),
-                            max(0.0, used_tok_i - l_star) / max(1.0, sigma_l),
-                        ]])
-                        c_hat_i = float(calib["trace_clf_lcsc"].predict_proba(feat_i)[0, 1])
-                    else:
-                        eff_feat = np.array([conf_raw_i * math.exp(-0.35 * max(0.0, ent_i - 0.35))])
-                        c_hat_i = float(iso_lcsc.predict(eff_feat)[0])
-                    if use_l_stop and was_trunc:
-                        dev_tokens = 0.0
-                    elif used_tok_i < l_min:
-                        dev_tokens = 1.5 * (l_star - used_tok_i)
-                    else:
-                        dev_tokens = max(0.0, used_tok_i - l_star)
-                    len_decay = math.exp(-eff_lambda * dev_tokens / sigma_l)
-                    tail_decay = 0.72 if (use_n_stop and idx_i >= 10) else 1.0
-                    w_i = c_hat_i * len_decay * tail_decay
-                    c_hats_by_ans[ans_i].append(c_hat_i * (0.75 + 0.25 * len_decay))
+                    eff_feat = np.array([conf_raw_i * math.exp(-0.35 * max(0.0, ent_i - 0.35))])
+                    c_hat_i = float(iso_lcsc.predict(eff_feat)[0])
+                if use_l_stop and was_trunc:
+                    dev_tokens = 0.0
+                elif used_tok_i < l_min:
+                    dev_tokens = 1.5 * (l_star - used_tok_i)
+                else:
+                    dev_tokens = max(0.0, used_tok_i - l_star)
+                len_decay = math.exp(-eff_lambda * dev_tokens / sigma_l)
+                tail_decay = 0.72 if idx_i >= 10 else 1.0
+                w_i = c_hat_i * len_decay * tail_decay
+                c_hats_by_ans[ans_i].append(c_hat_i * (0.75 + 0.25 * len_decay))
 
                 weighted_votes[ans_i] += w_i
 
@@ -400,7 +370,7 @@ def evaluate_method_on_questions(
             consensus_ratio = float(sorted_w[0] / total_w)
             margin_ratio = float((sorted_w[0] - (sorted_w[1] if len(sorted_w) > 1 else 0.0)) / total_w)
             mean_c_pred = float(np.mean(c_hats_by_ans[pred])) if c_hats_by_ans[pred] else 0.5
-            if method_type == "lc_sc" and "q_clf_lcsc" in calib:
+            if "q_clf_lcsc" in calib:
                 q_feat = np.array([[
                     consensus_ratio,
                     margin_ratio,
@@ -427,18 +397,10 @@ def evaluate_method_on_questions(
     samp_mean, _, _ = bootstrap_ci(per_q_samples, n_boot=500, seed=42)
 
     ece_val, cal_bins = calculate_ece_and_bins(np.array(per_q_correct), np.array(per_q_conf))
-    try:
-        if method_type == "standard_sc":
-            # ROC-AUC da confiança bruta não-calibrada do modelo nas trilhas amostradas (Tabela 1 de Huang et al., 2026)
-            raw_q_confs = [
-                float(df_q.iloc[:n_budget]["raw_confidence"].max())
-                for _, df_q in grouped_questions.items()
-            ]
-            auc_val = float(roc_auc_score(per_q_correct, raw_q_confs))
-        else:
-            auc_val = float(roc_auc_score(per_q_correct, per_q_conf))
-    except Exception:
-        auc_val = 0.5
+    auc_pct = (
+        round(float(roc_auc_score(per_q_correct, per_q_conf)) * 100.0, 2)
+        if len(set(per_q_correct)) > 1 else None
+    )
     brier_val = float(brier_score_loss(per_q_correct, np.clip(per_q_conf, 0.0, 1.0)))
 
     # Análise por fatia de dificuldade (Slice Analysis)
@@ -456,7 +418,7 @@ def evaluate_method_on_questions(
         "avg_samples_used": round(samp_mean, 2),
         "ece_pct": round(ece_val * 100.0, 2),
         "brier_score": round(brier_val, 4),
-        "roc_auc_pct": round(auc_val * 100.0, 2),
+        "roc_auc_pct": auc_pct,
         "truncated_traces": int(truncated_traces_count),
         "rescued_overcorrections": int(rescued_count),
         "slice_accuracy_pct": slice_acc,
@@ -593,6 +555,7 @@ def run_dataset_benchmark(df: pd.DataFrame, ds_name: str) -> Dict[str, Any]:
 
     return {
         "dataset": ds_name,
+        "trace_origin": "synthetic_gold_conditioned_anchor_expansion",
         "n_val_questions": int(df_val["question_id"].nunique()),
         "n_test_questions": int(df_test["question_id"].nunique()),
         "calibration_params": {
@@ -638,7 +601,8 @@ def main() -> None:
     math_res = run_dataset_benchmark(df_math, "MATH-500")
 
     full_out = {"gsm8k": gsm_res, "math500": math_res}
-    out_json = RESULTS_DIR / "benchmark_results.json"
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_json = OUT_DIR / "benchmark_results.json"
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(full_out, f, indent=2, ensure_ascii=False)
 
@@ -659,8 +623,8 @@ def main() -> None:
                 "ROC_AUC_Pct": m_stats["roc_auc_pct"],
             })
     df_summary = pd.DataFrame(rows)
-    df_summary.to_csv(RESULTS_DIR / "benchmark_summary_table.csv", index=False)
-    print("\n=== TABELA DE RESULTADOS FINAIS (TEST SPLIT) ===")
+    df_summary.to_csv(OUT_DIR / "benchmark_summary_table.csv", index=False)
+    print("\n=== REPLAY DO SIMULADOR NAS QUESTÕES DE TESTE ===")
     print(df_summary.to_string(index=False))
 
 

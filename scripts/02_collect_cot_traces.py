@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script 02: Coleta de Trilhas Chain-of-Thought (CoT) com Rastreamento de Entropia de Shannon Token-a-Token na GPU.
-Compatível com a estrutura CoTTrace definida em src/decoders/ e executável em GPU NVIDIA (FP16).
+Script legado das Fases 1–2: gera uma âncora por pergunta e simula variantes usando o gabarito.
+Os 16 registros salvos descrevem a simulação e não são amostras independentes do LLM.
 """
 
 import argparse
@@ -488,6 +488,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--rebuild-from-anchors", action="store_true")
     args = parser.parse_args()
+    print("[Simulação legada] As variantes salvas são construídas com o gabarito de cada questão.")
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
