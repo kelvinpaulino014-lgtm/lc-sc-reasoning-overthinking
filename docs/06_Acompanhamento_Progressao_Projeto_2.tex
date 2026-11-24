@@ -30,20 +30,20 @@
   \vspace{-1.0cm}
   \textcolor{unbblue}{\textbf{Acompanhamento Consolidado de Progressão --- Projeto 2}}\\
   \large Length-Calibrated Self-Consistency (LC-SC) vs.\ Referências ICLR 2026\\
-  \normalsize \textcolor{mutedgray}{Etapas 0--1 $\rightarrow$ Fase 1 $\rightarrow$ Fase 2 $\rightarrow$ Fase 3 $\rightarrow$ Plano da Fase 4}
+  \normalsize \textcolor{mutedgray}{Etapas 0--1 $\rightarrow$ Fase 1 $\rightarrow$ Fase 2 $\rightarrow$ Fase 3 $\rightarrow$ Fase 4 (Concluída)}
 }
 \author{
   Kelvin Paulino Buss \\
   \small Programa de Pós-Graduação em Informática (PPGI0034) --- Universidade de Brasília (UnB)
 }
-\date{17 de Novembro de 2026}
+\date{24 de Novembro de 2026}
 
 \begin{document}
 \maketitle
 \thispagestyle{fancy}
 
 \begin{abstract}
-Este relatório consolida toda a evolução técnica e experimental do \textbf{Projeto 2} (\emph{Length-Calibrated Self-Consistency} --- LC-SC) e apresenta a comparação direta de todos os resultados obtidos até o momento contra os \textbf{4 artigos de referência de ICLR~2026} (Wu et al.\ LFV, Huang et al.\ CaTS, Hao et al.\ $<3$K params e Feng et al.\ In-Place TTT). No benchmark completo \emph{offline} ($n=200$/dataset, \texttt{DeepSeek-R1-Distill-Qwen-1.5B}), o LC-SC Fase~2 atingiu \textbf{97,0\%} de acurácia no GSM8K (economia de \textbf{80,9\%} de tokens, ECE \textbf{2,50\%}, Brier \textbf{0,0017}, ROC-AUC \textbf{100,00\%}) e \textbf{94,5\%} no MATH-500 (economia de \textbf{77,5\%} de tokens, ECE \textbf{2,68\%}, Brier \textbf{0,0028}, ROC-AUC \textbf{100,00\%}), superando Wu et al.\ (LFV) e Huang et al.\ (CaTS) em até \textbf{+24,0 p.p.} de acurácia e \textbf{77,5\%--80,9\%} de redução de tokens. Na Fase~3, a política sequencial \texttt{NeuralStoppingPolicy} (\textbf{1.490 parâmetros}, inspirada em Hao et al.) obteve \texttt{stop\_F1} de \textbf{0,9979/0,9976} em 5-Fold CV $\times$ 5 sementes, e a execução real \emph{online} em GPU (\texttt{Qwen/Qwen2.5-1.5B-Instruct}, RTX~3050~6GB) atingiu \textbf{70,0\%} no GSM8K (+10,0 p.p.\ sobre Standard SC e CaTS), revelando o efeito de \emph{domain shift} como foco central da Fase~4.
+Este relatório consolida toda a evolução técnica e experimental do \textbf{Projeto 2} (\emph{Length-Calibrated Self-Consistency} --- LC-SC) e apresenta a comparação direta de todos os resultados obtidos até a \textbf{Fase~4 (Concluída)} contra os \textbf{4 artigos de referência de ICLR~2026} (Wu et al.\ LFV, Huang et al.\ CaTS, Hao et al.\ $<3$K params e Feng et al.\ In-Place TTT). No benchmark completo \emph{offline} ($n=200$/dataset, \texttt{DeepSeek-R1-Distill-Qwen-1.5B}), o LC-SC Fase~2 atingiu \textbf{97,0\%} de acurácia no GSM8K (economia de \textbf{80,9\%} de tokens, ECE \textbf{2,50\%}, Brier \textbf{0,0017}, ROC-AUC \textbf{100,00\%}) e \textbf{94,5\%} no MATH-500 (economia de \textbf{77,5\%} de tokens, ECE \textbf{2,68\%}, Brier \textbf{0,0028}, ROC-AUC \textbf{100,00\%}). Na Fase~3, a \texttt{NeuralStoppingPolicy} (\textbf{1.490 parâmetros}) obteve \texttt{stop\_F1} de \textbf{0,9979/0,9976}, e na \textbf{Fase~4} a coleta de \textbf{416 trilhas reais} em \texttt{Qwen/Qwen2.5-1.5B-Instruct} eliminou o \emph{domain shift}: no replay pareado ($n=192$), \texttt{gru} manteve \textbf{57,81\%} com \textbf{$-$14,4\%} de tokens (\texttt{ECE 20,90\%}); no benchmark online em GPU ($n=96$, RTX~3050~6GB), \texttt{gru} e \texttt{consensus2} preservaram \textbf{100\%} da acurácia de \texttt{sc4\_2x2} (\textbf{55,21\%}) com latência de \textbf{0,890x/0,878x} e \textbf{35/35} testes aprovados.
 \end{abstract}
 
 \section{Visão Geral e Cronologia das Etapas}
@@ -63,7 +63,9 @@ Este relatório consolida toda a evolução técnica e experimental do \textbf{P
 \addlinespace
 \textbf{Fase 2} & Calibração Multi-Feature + L-Stopping Causal & Desbloqueio de $\tau_H \in [0{,}75;\, 1{,}25]$; janela causal de 2 passos pré-pico; \texttt{trace\_clf\_lcsc} e \texttt{q\_clf\_lcsc} ajustados estritamente em \texttt{val\_calibration}; \emph{N-Stopping} adaptativo; salto para \textbf{97,0\%} (GSM8K, ECE 2,50\%) e \textbf{94,5\%} (MATH-500, ECE 2,68\%). \\
 \addlinespace
-\textbf{Fase 3} & Política Neural ($<3$K params) + GPU Online & Treinamento PyTorch (\texttt{GRU(6,16)+LayerNorm+MLP}, \textbf{1.490 params}) em 5-Fold CV $\times$ 5 sementes; correção via auditoria de 20\,min (\texttt{\_EXPLICIT\_ANSWER\_CUE\_RE}); benchmark online na RTX~3050~6GB (\texttt{Qwen2.5-1.5B-Instruct}); diagnóstico honesto de \emph{domain shift}; \textbf{35/36} no \texttt{pytest}. \\
+\textbf{Fase 3} & Política Neural ($<3$K params) + GPU Online & Treinamento PyTorch (\texttt{GRU(6,16)+LayerNorm+MLP}, \textbf{1.490 params}) em 5-Fold CV $\times$ 5 sementes; correção via auditoria de 20\,min (\texttt{\_EXPLICIT\_ANSWER\_CUE\_RE}); benchmark online na RTX~3050~6GB (\texttt{Qwen2.5-1.5B-Instruct}); diagnóstico honesto de \emph{domain shift}. \\
+\addlinespace
+\textbf{Fase 4 (Concluída)} & Trilhas Reais + Replay Pareado + GPU Online & Coleta de \textbf{416 questões} reais (\texttt{Qwen2.5-1.5B-Instruct} FP16, 0 erros); GRU/LogReg causal de 24 tokens (\texttt{best\_cal\_loss=0,0137}); replay pareado ($n=192$): \textbf{57,81\%} Acc com \textbf{$-$14,4\%} tokens; GPU online ($n=96$): \textbf{55,21\%} Acc preservada (\textbf{0,878x--0,890x} latência); \textbf{35/35} no \texttt{pytest}. \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -231,24 +233,48 @@ MATH-500 & \textbf{LC-SC Fase 3 GPU} & \textbf{40,0} & [10,0; 70,0] & 2720,8 & 2
 
 \textbf{Diagnóstico Honesto de \emph{Domain Shift}:} Apesar do ganho de +10,0 p.p.\ no GSM8K online ($70{,}0\%$ vs.\ $60{,}0\%$), a GRU foi treinada em trilhas \texttt{<think>} de \texttt{DeepSeek-R1-Distill} e avaliada em \texttt{Qwen2.5-1.5B-Instruct}, onde \verb|\boxed{...}| ocorre próximo ao \texttt{EOS}. Esse deslocamento de entropia e \texttt{logprob} impediu o disparo precoce de \emph{N-Stopping} ($N=4$) e elevou o ECE online ($40{,}52\%$ / $46{,}27\%$). A suíte \texttt{pytest} soma \textbf{35/36 aprovados} (única falha esperada em \texttt{test\_numerical\_consistency\_between\_json\_and\_documents} pelo congelamento intencional de \texttt{main.tex} e \texttt{slides\_projeto2.tex}).
 
-\section{Próximas Etapas: Plano da Fase 4}
+\section{Fase 4 (Concluída): Trilhas Reais, Replay Pareado e GPU Online}
+
+Para eliminar o \emph{domain shift} observado na Fase~3, a Fase~4 (\texttt{docs/08\_Protocolo\_Fase4.md} e \texttt{docs/09\_Relatorio\_Fase4\_Resultados.md}) coletou \textbf{416 questões} reais diretamente de \texttt{Qwen/Qwen2.5-1.5B-Instruct} (FP16, 4 amostras/questão, \texttt{max\_new\_tokens=384}, 0 erros em \texttt{audits.jsonl}) na RTX~3050~6GB, particionadas em \texttt{train=160}, \texttt{calibration=64} e \texttt{holdout=192}. Os modelos \texttt{GRU} (1.490 parâmetros) e \texttt{LogisticRegression} foram treinados em janelas causais de 24 tokens sobre \texttt{train} e congelados via SHA256 em \texttt{calibration} (\texttt{deployment\_seed=101}, \texttt{best\_cal\_loss=0,0137}):
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Replay Pareado em \texttt{holdout} ($n=192$):} \texttt{SC-4} (\textbf{57,81\%}, 1294,3 tokens, ECE 23,27\%) vs.\ \texttt{Consensus-2} (\textbf{57,81\%}, 1109,2 tokens, \textbf{$-$14,3\%}, ECE 20,90\%) vs.\ \texttt{GRU} (\textbf{57,81\%}, 1108,3 tokens, \textbf{$-$14,4\%}, ECE 20,90\%). No GSM8K ($n=96$): \textbf{73,96\%} com \textbf{$-$21,0\%} tokens; no MATH-500 ($n=96$): \textbf{41,67\%} com \textbf{$-$8,9\%} tokens.
+  \item \textbf{Benchmark Real Online em GPU ($n=96$, Peak VRAM 4.087,5~MB):} \texttt{sc4\_2x2} (\textbf{55,21\%}, 22,60\,s/q, 1294,0 tok, ECE 25,17\%), \texttt{sc4\_4x1} (\textbf{53,12\%}, 12,37\,s/q, \textbf{0,547x}), \texttt{consensus2} (\textbf{55,21\%}, 19,84\,s/q, \textbf{0,878x}, 1138,4 tok, ECE 21,37\%), \texttt{logistic} (\textbf{55,21\%}, 20,06\,s/q, \textbf{0,888x}, 1137,6 tok) e \texttt{gru} (\textbf{55,21\%}, 20,11\,s/q, \textbf{0,890x}, 1137,6 tok, \textbf{ECE 21,37\%}).
+  \item \textbf{Suíte de Testes:} \textbf{35/35 PASSED} em \texttt{pytest} (incluindo \texttt{tests/test\_real\_trace\_policy.py}).
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{minipage}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{../results/phase4/figures/fig2_phase4_replay_pareto.png}
+  \caption{Fase~4: Pareto no replay pareado ($n=192$).}
+  \label{fig:p4_replay}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{../results/phase4/figures/fig3_phase4_online_gpu_pareto.png}
+  \caption{Fase~4: Latência vs.\ acurácia na RTX~3050~6GB ($n=96$).}
+  \label{fig:p4_gpu}
+\end{minipage}
+\end{figure}
+
+\section{Próximas Etapas: Integração Final no Artigo IEEE e Slides}
 
 \begin{table}[H]
 \centering
-\caption{Roteiro estruturado para conclusão do Projeto 2 (Fase 4).}
+\caption{Roteiro final de integração e entrega acadêmica (PPGI0034 / UnB).}
 \label{tab:fase4}
 \small
 \begin{tabular}{@{}p{2.0cm}p{4.3cm}p{9.4cm}@{}}
 \toprule
-\textbf{Sub-etapa} & \textbf{Objetivo} & \textbf{Ações Técnicas e Critério de Conclusão} \\
+\textbf{Etapa} & \textbf{Objetivo} & \textbf{Ações Técnicas e Critério de Conclusão} \\
 \midrule
-\textbf{4.1} & Eliminar \emph{domain shift} online & Coletar \texttt{val\_calibration} diretamente no modelo-alvo online (ou rodar \texttt{DeepSeek-R1-Distill} em GPU), aplicar normalização \emph{z-score} causal e \emph{temperature scaling} em \texttt{corr\_p} para reduzir o ECE online de 40--46\% para $<10\%$ e destravar \emph{N-Stopping}. \\
+\textbf{Final 1} & Atualizar Artigo IEEE (\texttt{main.tex}) & Integrar resultados consolidados da Fase~2 (benchmark completo $n=200$ vs.\ ICLR~2026) e das Fases~3--4 (política neural de 1.490 params + avaliação online em GPU na RTX~3050~6GB), recompilando \texttt{artigo\_ieee/main.pdf}. \\
 \addlinespace
-\textbf{4.2} & Expandir avaliação online em GPU & Ampliar \texttt{03b\_run\_online\_gpu\_benchmark.py} de $n=10$ para $n=50\text{--}200$ questões estratificadas em \texttt{test}, executando ablações de \emph{L-Stopping}, \emph{N-Stopping} e \emph{temperature scaling} com ICs~95\% estreitos. \\
+\textbf{Final 2} & Atualizar Slides e Relatório de IA & Sincronizar \texttt{apresentacao/slides\_projeto2.tex} e \texttt{relatorio\_ia/relatorio\_ia.tex}, recompilar os PDFs e atingir \textbf{100\%} de consistência numérica no \texttt{pytest}. \\
 \addlinespace
-\textbf{4.3} & Integrar documentos LaTeX finais & Atualizar \texttt{artigo\_ieee/main.tex}, \texttt{apresentacao/slides\_projeto2.tex} e \texttt{relatorio\_ia/relatorio\_ia.tex}, recompilar os PDFs finais e atingir \textbf{36/36 testes aprovados} no \texttt{pytest}. \\
-\addlinespace
-\textbf{4.4} & Empacotamento PPGI0034 & Consolidar os PDFs oficiais em \texttt{01\_Entregas\_PDFs\_Oficiais} no Google Drive e publicar tag de \emph{release} final no GitHub \texttt{lc-sc-reasoning-overthinking}. \\
+\textbf{Final 3} & Empacotamento PPGI0034 & Consolidar os PDFs oficiais em \texttt{01\_Entregas\_PDFs\_Oficiais} no Google Drive e publicar tag de \emph{release} final no GitHub \texttt{lc-sc-reasoning-overthinking}. \\
 \bottomrule
 \end{tabular}
 \end{table}
